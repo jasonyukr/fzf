@@ -307,6 +307,8 @@ const (
 	actSigStop
 	actFirst
 	actLast
+	actScrollToFirstSelection
+	actScrollToLastSelection
 	actReload
 	actDisableSearch
 	actEnableSearch
@@ -2555,6 +2557,26 @@ func (t *Terminal) Loop() {
 			case actLast:
 				t.vset(t.merger.Length() - 1)
 				req(reqList)
+			case actScrollToFirstSelection:
+				if len(t.selected) > 0 {
+					// ClearQuery
+					t.input = []rune{}
+					t.cx = 0
+					// scroll to first
+					sortedSelection := t.sortSelected()
+					t.vset(int(sortedSelection[0].item.Index()))
+					req(reqList)
+				}
+			case actScrollToLastSelection:
+				if len(t.selected) > 0 {
+					// ClearQuery
+					t.input = []rune{}
+					t.cx = 0
+					// scroll to last
+					sortedSelection := t.sortSelected()
+					t.vset(int(sortedSelection[len(sortedSelection) - 1].item.Index()))
+					req(reqList)
+				}
 			case actUnixLineDiscard:
 				beof = len(t.input) == 0
 				if t.cx > 0 {
