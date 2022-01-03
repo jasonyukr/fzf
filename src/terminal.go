@@ -1797,6 +1797,15 @@ func (t *Terminal) executeCommand(template string, forcePlus bool, background bo
 	}
 	command := t.replacePlaceholder(template, forcePlus, string(t.input), list)
 	cmd := util.ExecCommand(command, false)
+	if len(t.selected) > 0 {
+		cmd.Env = os.Environ()
+		for idx, sel := range t.sortSelected() {
+			if idx > 20 {
+				break
+			}
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%s_%d=%s", "FZF_SELECTED", idx + 1, sel.item.AsString(true)))
+		}
+	}
 	t.executing.Set(true)
 	if !background {
 		cmd.Stdin = tui.TtyIn()
