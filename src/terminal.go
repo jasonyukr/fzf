@@ -2559,20 +2559,12 @@ func (t *Terminal) Loop() {
 				req(reqList)
 			case actScrollToFirstSelection:
 				if len(t.selected) > 0 {
-					// ClearQuery
-					t.input = []rune{}
-					t.cx = 0
-					// scroll to first
 					sortedSelection := t.sortSelected()
-					t.vset(int(sortedSelection[0].item.Index()))
+                    t.vset(int(sortedSelection[0].item.Index()))
 					req(reqList)
 				}
 			case actScrollToLastSelection:
 				if len(t.selected) > 0 {
-					// ClearQuery
-					t.input = []rune{}
-					t.cx = 0
-					// scroll to last
 					sortedSelection := t.sortSelected()
 					t.vset(int(sortedSelection[len(sortedSelection) - 1].item.Index()))
 					req(reqList)
