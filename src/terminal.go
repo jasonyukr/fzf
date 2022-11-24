@@ -323,6 +323,8 @@ const (
 	actSigStop
 	actFirst
 	actLast
+	actScrollToFirstSelection
+	actScrollToLastSelection
 	actReload
 	actDisableSearch
 	actEnableSearch
@@ -2006,6 +2008,25 @@ func (t *Terminal) executeCommand(template string, forcePlus bool, background bo
 	}
 	command := t.replacePlaceholder(template, forcePlus, string(t.input), list)
 	cmd := util.ExecCommand(command, false)
+	if len(t.selected) > 0 {
+        selList := ""
+		cmd.Env = os.Environ()
+		for idx, sel := range t.sortSelected() {
+			if idx > 39 {
+				break
+			}
+            itemStr := sel.item.AsString(true)
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%s_%d=%s", "FZF_SELECTED", idx + 1, itemStr))
+            if selList == "" {
+                selList = itemStr
+            } else {
+                selList += ("\n" + itemStr)
+            }
+		}
+        if selList != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("FZF_SELECTED=%s", selList))
+        }
+	}
 	t.executing.Set(true)
 	if !background {
 		cmd.Stdin = tui.TtyIn()
@@ -2799,6 +2820,18 @@ func (t *Terminal) Loop() {
 			case actLast:
 				t.vset(t.merger.Length() - 1)
 				req(reqList)
+			case actScrollToFirstSelection:
+				if len(t.selected) > 0 {
+					sortedSelection := t.sortSelected()
+                    t.vset(int(sortedSelection[0].item.Index()))
+					req(reqList)
+				}
+			case actScrollToLastSelection:
+				if len(t.selected) > 0 {
+					sortedSelection := t.sortSelected()
+					t.vset(int(sortedSelection[len(sortedSelection) - 1].item.Index()))
+					req(reqList)
+				}
 			case actUnixLineDiscard:
 				beof = len(t.input) == 0
 				if t.cx > 0 {
