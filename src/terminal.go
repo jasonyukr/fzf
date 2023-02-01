@@ -1276,7 +1276,7 @@ func (t *Terminal) printInfo() {
     if t.showCurrentIndex {
         currentItem := t.currentItem()
         if currentItem != nil {
-            output += fmt.Sprintf(" [%d]", currentItem.Index())
+            output += fmt.Sprintf(" [%d] *%d", currentItem.Index(), markIndex)
         }
     }
 
