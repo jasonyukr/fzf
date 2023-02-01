@@ -297,6 +297,7 @@ type Options struct {
 	Unicode      bool
 	Tabstop      int
 	ClearOnExit  bool
+	ShowCurrentIndex bool
 	Version      bool
 }
 
@@ -364,6 +365,7 @@ func defaultOptions() *Options {
 		BorderLabel:  labelOpts{},
 		PreviewLabel: labelOpts{},
 		ClearOnExit:  true,
+		ShowCurrentIndex: false,
 		Version:      false}
 }
 
@@ -1050,6 +1052,10 @@ func parseKeymap(keymap map[tui.Event][]*action, str string) {
 				appendAction(actFirst)
 			case "last":
 				appendAction(actLast)
+			case "clear-query-after-mark":
+				appendAction(actClearQueryAfterMark)
+			case "jump-to-mark":
+				appendAction(actJumpToMark)
 			case "scroll-to-first-selection":
 				appendAction(actScrollToFirstSelection)
 			case "scroll-to-last-selection":
@@ -1653,6 +1659,8 @@ func parseOptions(opts *Options, allArgs []string) {
 			opts.ClearOnExit = true
 		case "--no-clear":
 			opts.ClearOnExit = false
+		case "--show-current-index":
+			opts.ShowCurrentIndex = true
 		case "--version":
 			opts.Version = true
 		case "--":

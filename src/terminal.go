@@ -202,6 +202,7 @@ type Terminal struct {
 	killChan           chan int
 	slab               *util.Slab
 	theme              *tui.ColorTheme
+    showCurrentIndex   bool
 	tui                tui.Renderer
 	executing          *util.AtomicBool
 }
@@ -250,6 +251,8 @@ type action struct {
 }
 
 type actionType int
+
+var markIndex int
 
 const (
 	actIgnore actionType = iota
@@ -323,6 +326,8 @@ const (
 	actSigStop
 	actFirst
 	actLast
+    actClearQueryAfterMark
+    actJumpToMark
 	actScrollToFirstSelection
 	actScrollToLastSelection
 	actReload
@@ -593,6 +598,7 @@ func NewTerminal(opts *Options, eventBox *util.EventBox) *Terminal {
 		sigstop:            false,
 		slab:               util.MakeSlab(slab16Size, slab32Size),
 		theme:              opts.Theme,
+		showCurrentIndex:   opts.ShowCurrentIndex,
 		startChan:          make(chan fitpad, 1),
 		killChan:           make(chan int),
 		tui:                renderer,
@@ -1266,6 +1272,14 @@ func (t *Terminal) printInfo() {
 	if t.progress > 0 && t.progress < 100 {
 		output += fmt.Sprintf(" (%d%%)", t.progress)
 	}
+
+    if t.showCurrentIndex {
+        currentItem := t.currentItem()
+        if currentItem != nil {
+            output += fmt.Sprintf(" [%d]", currentItem.Index())
+        }
+    }
+
 	if t.failed != nil && t.count == 0 {
 		output = fmt.Sprintf("[Command failed: %s]", *t.failed)
 	}
@@ -2590,6 +2604,9 @@ func (t *Terminal) Loop() {
 				if !doAction(action) {
 					return false
 				}
+                if t.showCurrentIndex {
+                    t.printInfo()
+                }
 			}
 			return true
 		}
@@ -2820,10 +2837,20 @@ func (t *Terminal) Loop() {
 			case actLast:
 				t.vset(t.merger.Length() - 1)
 				req(reqList)
+            case actClearQueryAfterMark:
+                current := t.currentItem()
+                if current != nil {
+                    markIndex = int(current.Index())
+                }
+                t.input = []rune{}
+                t.cx = 0
+            case actJumpToMark:
+                t.vset(markIndex)
+                req(reqList)
 			case actScrollToFirstSelection:
 				if len(t.selected) > 0 {
 					sortedSelection := t.sortSelected()
-                    t.vset(int(sortedSelection[0].item.Index()))
+					t.vset(int(sortedSelection[0].item.Index()))
 					req(reqList)
 				}
 			case actScrollToLastSelection:
