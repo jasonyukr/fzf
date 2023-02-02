@@ -252,7 +252,7 @@ type action struct {
 
 type actionType int
 
-var markIndex int
+var markIndex int = -1
 
 const (
 	actIgnore actionType = iota
@@ -1276,7 +1276,19 @@ func (t *Terminal) printInfo() {
     if t.showCurrentIndex {
         currentItem := t.currentItem()
         if currentItem != nil {
-            output += fmt.Sprintf(" [%d] *%d", currentItem.Index(), markIndex)
+            output += fmt.Sprintf(" [%d]", currentItem.Index())
+            if markIndex != -1 {
+                output += fmt.Sprintf(" *%d", markIndex)
+            }
+
+            if len(t.selected) > 0 {
+                output += " {"
+                sortedSelection := t.sortSelected()
+                for _, sel := range sortedSelection[:len(sortedSelection)-1] {
+                    output += fmt.Sprintf("%d-", sel.item.Index())
+                }
+                output += fmt.Sprintf("%d}", sortedSelection[len(sortedSelection)-1].item.Index())
+            }
         }
     }
 
