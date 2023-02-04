@@ -252,7 +252,10 @@ type action struct {
 
 type actionType int
 
-var markIndex int = -1
+var mark1Index int = -1
+var mark2Index int = -1
+var mark3Index int = -1
+var mark4Index int = -1
 
 const (
 	actIgnore actionType = iota
@@ -326,8 +329,14 @@ const (
 	actSigStop
 	actFirst
 	actLast
-    actClearQueryAfterMark
-    actJumpToMark
+    actSetMark1
+    actSetMark2
+    actSetMark3
+    actSetMark4
+    actJumpToMark1
+    actJumpToMark2
+    actJumpToMark3
+    actJumpToMark4
 	actScrollToFirstSelection
 	actScrollToLastSelection
 	actReload
@@ -1277,8 +1286,26 @@ func (t *Terminal) printInfo() {
         currentItem := t.currentItem()
         if currentItem != nil {
             output += fmt.Sprintf(" [%d]", currentItem.Index())
-            if markIndex != -1 {
-                output += fmt.Sprintf(" *%d", markIndex)
+
+            if mark1Index != -1 {
+                output += fmt.Sprintf(" *%d*", mark1Index)
+                if mark2Index != -1 || mark3Index != -1 || mark4Index != -1 {
+                    if mark2Index == -1 {
+                        output += "_*"
+                    } else {
+                        output += fmt.Sprintf("%d*", mark2Index)
+                    }
+                    if mark3Index == -1 {
+                        output += "_*"
+                    } else {
+                        output += fmt.Sprintf("%d*", mark3Index)
+                    }
+                    if mark4Index == -1 {
+                        output += "_*"
+                    } else {
+                        output += fmt.Sprintf("%d*", mark4Index)
+                    }
+                }
             }
 
             if len(t.selected) > 0 {
@@ -2849,16 +2876,55 @@ func (t *Terminal) Loop() {
 			case actLast:
 				t.vset(t.merger.Length() - 1)
 				req(reqList)
-            case actClearQueryAfterMark:
+            ///////////////////////////////////////////////////////////////////
+            case actSetMark1:
                 current := t.currentItem()
                 if current != nil {
-                    markIndex = int(current.Index())
+                    mark1Index = int(current.Index())
                 }
                 t.input = []rune{}
                 t.cx = 0
-            case actJumpToMark:
-                t.vset(markIndex)
-                req(reqList)
+            case actSetMark2:
+                current := t.currentItem()
+                if current != nil {
+                    mark2Index = int(current.Index())
+                }
+                t.input = []rune{}
+                t.cx = 0
+            case actSetMark3:
+                current := t.currentItem()
+                if current != nil {
+                    mark3Index = int(current.Index())
+                }
+                t.input = []rune{}
+                t.cx = 0
+            case actSetMark4:
+                current := t.currentItem()
+                if current != nil {
+                    mark4Index = int(current.Index())
+                }
+                t.input = []rune{}
+                t.cx = 0
+            case actJumpToMark1:
+                if mark1Index != -1 {
+                    t.vset(mark1Index)
+                    req(reqList)
+                }
+            case actJumpToMark2:
+                if mark2Index != -1 {
+                    t.vset(mark2Index)
+                    req(reqList)
+                }
+            case actJumpToMark3:
+                if mark3Index != -1 {
+                    t.vset(mark3Index)
+                    req(reqList)
+                }
+            case actJumpToMark4:
+                if mark4Index != -1 {
+                    t.vset(mark4Index)
+                    req(reqList)
+                }
 			case actScrollToFirstSelection:
 				if len(t.selected) > 0 {
 					sortedSelection := t.sortSelected()
@@ -2871,6 +2937,7 @@ func (t *Terminal) Loop() {
 					t.vset(int(sortedSelection[len(sortedSelection) - 1].item.Index()))
 					req(reqList)
 				}
+            ///////////////////////////////////////////////////////////////////
 			case actUnixLineDiscard:
 				beof = len(t.input) == 0
 				if t.cx > 0 {

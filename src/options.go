@@ -1052,10 +1052,22 @@ func parseKeymap(keymap map[tui.Event][]*action, str string) {
 				appendAction(actFirst)
 			case "last":
 				appendAction(actLast)
-			case "clear-query-after-mark":
-				appendAction(actClearQueryAfterMark)
-			case "jump-to-mark":
-				appendAction(actJumpToMark)
+			case "set-mark1":
+				appendAction(actSetMark1)
+			case "set-mark2":
+				appendAction(actSetMark2)
+			case "set-mark3":
+				appendAction(actSetMark3)
+			case "set-mark4":
+				appendAction(actSetMark4)
+			case "jump-to-mark1":
+				appendAction(actJumpToMark1)
+			case "jump-to-mark2":
+				appendAction(actJumpToMark2)
+			case "jump-to-mark3":
+				appendAction(actJumpToMark3)
+			case "jump-to-mark4":
+				appendAction(actJumpToMark4)
 			case "scroll-to-first-selection":
 				appendAction(actScrollToFirstSelection)
 			case "scroll-to-last-selection":
