@@ -1287,24 +1287,27 @@ func (t *Terminal) printInfo() {
         if currentItem != nil {
             output += fmt.Sprintf(" [%d]", currentItem.Index())
 
-            if mark1Index != -1 {
-                output += fmt.Sprintf(" *%d*", mark1Index)
-                if mark2Index != -1 || mark3Index != -1 || mark4Index != -1 {
-                    if mark2Index == -1 {
-                        output += "_*"
-                    } else {
-                        output += fmt.Sprintf("%d*", mark2Index)
-                    }
-                    if mark3Index == -1 {
-                        output += "_*"
-                    } else {
-                        output += fmt.Sprintf("%d*", mark3Index)
-                    }
-                    if mark4Index == -1 {
-                        output += "_*"
-                    } else {
-                        output += fmt.Sprintf("%d*", mark4Index)
-                    }
+            if mark1Index != -1 || mark2Index != -1 || mark3Index != -1 || mark4Index != -1 {
+                output += " *"
+                if mark1Index == -1 {
+                    output += "_*"
+                } else {
+                    output += fmt.Sprintf("%d*", mark1Index)
+                }
+                if mark2Index == -1 {
+                    output += "_*"
+                } else {
+                    output += fmt.Sprintf("%d*", mark2Index)
+                }
+                if mark3Index == -1 {
+                    output += "_*"
+                } else {
+                    output += fmt.Sprintf("%d*", mark3Index)
+                }
+                if mark4Index == -1 {
+                    output += "_*"
+                } else {
+                    output += fmt.Sprintf("%d*", mark4Index)
                 }
             }
 
