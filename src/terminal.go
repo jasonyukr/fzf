@@ -300,7 +300,7 @@ var mark1Index int = -1
 var mark2Index int = -1
 var mark3Index int = -1
 var mark4Index int = -1
-var markIndexStr = "-"
+var markIndexStr = "•"
 
 const (
 	actIgnore actionType = iota
