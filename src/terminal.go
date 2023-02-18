@@ -245,6 +245,7 @@ type Terminal struct {
 	eventChan          chan tui.Event
 	slab               *util.Slab
 	theme              *tui.ColorTheme
+	showCurrentIndex   bool
 	tui                tui.Renderer
 	executing          *util.AtomicBool
 }
@@ -295,8 +296,23 @@ type action struct {
 
 type actionType int
 
+var mark1Index int = -1
+var mark2Index int = -1
+var mark3Index int = -1
+var mark4Index int = -1
+
 const (
 	actIgnore actionType = iota
+	actSetMark1
+	actSetMark2
+	actSetMark3
+	actSetMark4
+	actJumpToMark1
+	actJumpToMark2
+	actJumpToMark3
+	actJumpToMark4
+	actScrollToFirstSelection
+	actScrollToLastSelection
 	actInvalid
 	actRune
 	actMouse
@@ -655,6 +671,7 @@ func NewTerminal(opts *Options, eventBox *util.EventBox) *Terminal {
 		sigstop:            false,
 		slab:               util.MakeSlab(slab16Size, slab32Size),
 		theme:              opts.Theme,
+		showCurrentIndex:   opts.ShowCurrentIndex,
 		startChan:          make(chan fitpad, 1),
 		killChan:           make(chan int),
 		serverChan:         make(chan []*action, 10),
@@ -1441,6 +1458,47 @@ func (t *Terminal) printInfo() {
 	if t.progress > 0 && t.progress < 100 {
 		output += fmt.Sprintf(" (%d%%)", t.progress)
 	}
+
+    if t.showCurrentIndex {
+        currentItem := t.currentItem()
+        if currentItem != nil {
+            output += fmt.Sprintf(" [%d]", currentItem.Index())
+
+            if mark1Index != -1 || mark2Index != -1 || mark3Index != -1 || mark4Index != -1 {
+                output += " *"
+                if mark1Index == -1 {
+                    output += "_*"
+                } else {
+                    output += fmt.Sprintf("%d*", mark1Index)
+                }
+                if mark2Index == -1 {
+                    output += "_*"
+                } else {
+                    output += fmt.Sprintf("%d*", mark2Index)
+                }
+                if mark3Index == -1 {
+                    output += "_*"
+                } else {
+                    output += fmt.Sprintf("%d*", mark3Index)
+                }
+                if mark4Index == -1 {
+                    output += "_*"
+                } else {
+                    output += fmt.Sprintf("%d*", mark4Index)
+                }
+            }
+
+            if len(t.selected) > 0 {
+                output += " {"
+                sortedSelection := t.sortSelected()
+                for _, sel := range sortedSelection[:len(sortedSelection)-1] {
+                    output += fmt.Sprintf("%d-", sel.item.Index())
+                }
+                output += fmt.Sprintf("%d}", sortedSelection[len(sortedSelection)-1].item.Index())
+            }
+        }
+    }
+
 	if t.failed != nil && t.count == 0 {
 		output = fmt.Sprintf("[Command failed: %s]", *t.failed)
 	}
@@ -2247,6 +2305,25 @@ func (t *Terminal) executeCommand(template string, forcePlus bool, background bo
 	}
 	command := t.replacePlaceholder(template, forcePlus, string(t.input), list)
 	cmd := util.ExecCommand(command, false)
+	if len(t.selected) > 0 {
+        selList := ""
+		cmd.Env = os.Environ()
+		for idx, sel := range t.sortSelected() {
+			if idx > 39 {
+				break
+			}
+            itemStr := sel.item.AsString(true)
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%s_%d=%s", "FZF_SELECTED", idx + 1, itemStr))
+            if selList == "" {
+                selList = itemStr
+            } else {
+                selList += ("\n" + itemStr)
+            }
+		}
+        if selList != "" {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("FZF_SELECTED=%s", selList))
+        }
+	}
 	t.executing.Set(true)
 	if !background {
 		cmd.Stdin = tui.TtyIn()
@@ -2856,11 +2933,74 @@ func (t *Terminal) Loop() {
 				if !doAction(action) {
 					return false
 				}
+                if t.showCurrentIndex {
+                    t.printInfo()
+                }
 			}
 			return true
 		}
 		doAction = func(a *action) bool {
 			switch a.t {
+            case actSetMark1:
+                current := t.currentItem()
+                if current != nil {
+                    mark1Index = int(current.Index())
+                }
+                t.input = []rune{}
+                t.cx = 0
+            case actSetMark2:
+                current := t.currentItem()
+                if current != nil {
+                    mark2Index = int(current.Index())
+                }
+                t.input = []rune{}
+                t.cx = 0
+            case actSetMark3:
+                current := t.currentItem()
+                if current != nil {
+                    mark3Index = int(current.Index())
+                }
+                t.input = []rune{}
+                t.cx = 0
+            case actSetMark4:
+                current := t.currentItem()
+                if current != nil {
+                    mark4Index = int(current.Index())
+                }
+                t.input = []rune{}
+                t.cx = 0
+            case actJumpToMark1:
+                if mark1Index != -1 {
+                    t.vset(mark1Index)
+                    req(reqList)
+                }
+            case actJumpToMark2:
+                if mark2Index != -1 {
+                    t.vset(mark2Index)
+                    req(reqList)
+                }
+            case actJumpToMark3:
+                if mark3Index != -1 {
+                    t.vset(mark3Index)
+                    req(reqList)
+                }
+            case actJumpToMark4:
+                if mark4Index != -1 {
+                    t.vset(mark4Index)
+                    req(reqList)
+                }
+			case actScrollToFirstSelection:
+				if len(t.selected) > 0 {
+					sortedSelection := t.sortSelected()
+					t.vset(int(sortedSelection[0].item.Index()))
+					req(reqList)
+				}
+			case actScrollToLastSelection:
+				if len(t.selected) > 0 {
+					sortedSelection := t.sortSelected()
+					t.vset(int(sortedSelection[len(sortedSelection) - 1].item.Index()))
+					req(reqList)
+				}
 			case actIgnore:
 			case actBecome:
 				valid, list := t.buildPlusList(a.a, false)

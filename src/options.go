@@ -318,6 +318,7 @@ type Options struct {
 	Tabstop      int
 	ListenPort   int
 	ClearOnExit  bool
+	ShowCurrentIndex bool
 	Version      bool
 }
 
@@ -386,6 +387,7 @@ func defaultOptions() *Options {
 		BorderLabel:  labelOpts{},
 		PreviewLabel: labelOpts{},
 		ClearOnExit:  true,
+		ShowCurrentIndex: false,
 		Version:      false}
 }
 
@@ -1006,6 +1008,26 @@ func parseActionList(masked string, original string, prevActions []*action, putA
 		spec = prevSpec + spec
 		specLower := strings.ToLower(spec)
 		switch specLower {
+		case "set-mark1":
+			appendAction(actSetMark1)
+		case "set-mark2":
+			appendAction(actSetMark2)
+		case "set-mark3":
+			appendAction(actSetMark3)
+		case "set-mark4":
+			appendAction(actSetMark4)
+		case "jump-to-mark1":
+			appendAction(actJumpToMark1)
+		case "jump-to-mark2":
+			appendAction(actJumpToMark2)
+		case "jump-to-mark3":
+			appendAction(actJumpToMark3)
+		case "jump-to-mark4":
+			appendAction(actJumpToMark4)
+		case "scroll-to-first-selection":
+			appendAction(actScrollToFirstSelection)
+		case "scroll-to-last-selection":
+			appendAction(actScrollToLastSelection)
 		case "ignore":
 			appendAction(actIgnore)
 		case "beginning-of-line":
@@ -1763,6 +1785,8 @@ func parseOptions(opts *Options, allArgs []string) {
 			opts.ClearOnExit = true
 		case "--no-clear":
 			opts.ClearOnExit = false
+		case "--show-current-index":
+			opts.ShowCurrentIndex = true
 		case "--version":
 			opts.Version = true
 		case "--":
