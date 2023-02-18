@@ -300,7 +300,10 @@ var mark1Index int = -1
 var mark2Index int = -1
 var mark3Index int = -1
 var mark4Index int = -1
-var markIndexStr = "•"
+var mark1Str = "•"
+var mark2Str = ":"
+var mark3Str = "⁖"
+var mark4Str = "⁘"
 
 const (
 	actIgnore actionType = iota
@@ -1620,13 +1623,13 @@ func (t *Terminal) printItem(result Result, line int, i int, current bool, bar b
 		if selected {
 			t.window.CPrint(tui.ColCurrentSelected, t.marker)
 		} else if int(item.Index()) == mark1Index {
-			t.window.CPrint(tui.ColSelected, markIndexStr) 
+			t.window.CPrint(tui.ColSelected, mark1Str) 
 		} else if int(item.Index()) == mark2Index {
-			t.window.CPrint(tui.ColSelected, markIndexStr) 
+			t.window.CPrint(tui.ColSelected, mark2Str) 
 		} else if int(item.Index()) == mark3Index {
-			t.window.CPrint(tui.ColSelected, markIndexStr) 
+			t.window.CPrint(tui.ColSelected, mark3Str) 
 		} else if int(item.Index()) == mark4Index {
-			t.window.CPrint(tui.ColSelected, markIndexStr) 
+			t.window.CPrint(tui.ColSelected, mark4Str) 
 		} else {
 			t.window.CPrint(tui.ColCurrentSelectedEmpty, t.markerEmpty)
 		}
@@ -1640,13 +1643,13 @@ func (t *Terminal) printItem(result Result, line int, i int, current bool, bar b
 		if selected {
 			t.window.CPrint(tui.ColSelected, t.marker)
 		} else if int(item.Index()) == mark1Index {
-			t.window.CPrint(tui.ColSelected, markIndexStr) 
+			t.window.CPrint(tui.ColSelected, mark1Str) 
 		} else if int(item.Index()) == mark2Index {
-			t.window.CPrint(tui.ColSelected, markIndexStr) 
+			t.window.CPrint(tui.ColSelected, mark2Str) 
 		} else if int(item.Index()) == mark3Index {
-			t.window.CPrint(tui.ColSelected, markIndexStr) 
+			t.window.CPrint(tui.ColSelected, mark3Str) 
 		} else if int(item.Index()) == mark4Index {
-			t.window.CPrint(tui.ColSelected, markIndexStr) 
+			t.window.CPrint(tui.ColSelected, mark4Str) 
 		} else {
 			t.window.Print(t.markerEmpty)
 		}
@@ -2964,30 +2967,26 @@ func (t *Terminal) Loop() {
 				current := t.currentItem()
 				if current != nil {
 					mark1Index = int(current.Index())
+					req(reqFullRedraw)
 				}
-				t.input = []rune{}
-				t.cx = 0
 			case actSetMark2:
 				current := t.currentItem()
 				if current != nil {
 					mark2Index = int(current.Index())
+					req(reqFullRedraw)
 				}
-				t.input = []rune{}
-				t.cx = 0
 			case actSetMark3:
 				current := t.currentItem()
 				if current != nil {
 					mark3Index = int(current.Index())
+					req(reqFullRedraw)
 				}
-				t.input = []rune{}
-				t.cx = 0
 			case actSetMark4:
 				current := t.currentItem()
 				if current != nil {
 					mark4Index = int(current.Index())
+					req(reqFullRedraw)
 				}
-				t.input = []rune{}
-				t.cx = 0
 			case actJumpToMark1:
 				if mark1Index != -1 {
 					t.vset(mark1Index)
