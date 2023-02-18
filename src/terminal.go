@@ -300,6 +300,7 @@ var mark1Index int = -1
 var mark2Index int = -1
 var mark3Index int = -1
 var mark4Index int = -1
+var markIndexStr = "-"
 
 const (
 	actIgnore actionType = iota
@@ -1618,6 +1619,14 @@ func (t *Terminal) printItem(result Result, line int, i int, current bool, bar b
 		}
 		if selected {
 			t.window.CPrint(tui.ColCurrentSelected, t.marker)
+		} else if int(item.Index()) == mark1Index {
+			t.window.CPrint(tui.ColSelected, markIndexStr) 
+		} else if int(item.Index()) == mark2Index {
+			t.window.CPrint(tui.ColSelected, markIndexStr) 
+		} else if int(item.Index()) == mark3Index {
+			t.window.CPrint(tui.ColSelected, markIndexStr) 
+		} else if int(item.Index()) == mark4Index {
+			t.window.CPrint(tui.ColSelected, markIndexStr) 
 		} else {
 			t.window.CPrint(tui.ColCurrentSelectedEmpty, t.markerEmpty)
 		}
@@ -1630,6 +1639,14 @@ func (t *Terminal) printItem(result Result, line int, i int, current bool, bar b
 		}
 		if selected {
 			t.window.CPrint(tui.ColSelected, t.marker)
+		} else if int(item.Index()) == mark1Index {
+			t.window.CPrint(tui.ColSelected, markIndexStr) 
+		} else if int(item.Index()) == mark2Index {
+			t.window.CPrint(tui.ColSelected, markIndexStr) 
+		} else if int(item.Index()) == mark3Index {
+			t.window.CPrint(tui.ColSelected, markIndexStr) 
+		} else if int(item.Index()) == mark4Index {
+			t.window.CPrint(tui.ColSelected, markIndexStr) 
 		} else {
 			t.window.Print(t.markerEmpty)
 		}
