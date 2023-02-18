@@ -315,8 +315,6 @@ const (
 	actJumpToMark2
 	actJumpToMark3
 	actJumpToMark4
-	actScrollToFirstSelection
-	actScrollToLastSelection
 	actInvalid
 	actRune
 	actMouse
@@ -3005,18 +3003,6 @@ func (t *Terminal) Loop() {
 			case actJumpToMark4:
 				if mark4Index != -1 {
 					t.vset(mark4Index)
-					req(reqList)
-				}
-			case actScrollToFirstSelection:
-				if len(t.selected) > 0 {
-					sortedSelection := t.sortSelected()
-					t.vset(int(sortedSelection[0].item.Index()))
-					req(reqList)
-				}
-			case actScrollToLastSelection:
-				if len(t.selected) > 0 {
-					sortedSelection := t.sortSelected()
-					t.vset(int(sortedSelection[len(sortedSelection) - 1].item.Index()))
 					req(reqList)
 				}
 			case actIgnore:

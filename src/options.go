@@ -1024,10 +1024,6 @@ func parseActionList(masked string, original string, prevActions []*action, putA
 			appendAction(actJumpToMark3)
 		case "jump-to-mark4":
 			appendAction(actJumpToMark4)
-		case "scroll-to-first-selection":
-			appendAction(actScrollToFirstSelection)
-		case "scroll-to-last-selection":
-			appendAction(actScrollToLastSelection)
 		case "ignore":
 			appendAction(actIgnore)
 		case "beginning-of-line":
