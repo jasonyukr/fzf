@@ -368,6 +368,7 @@ const (
 	actPreview
 	actChangePreview
 	actChangePreviewWindow
+	actGotoFile
 	actGoto
 	actPreviewTop
 	actPreviewBottom
@@ -3621,19 +3622,31 @@ func (t *Terminal) Loop() {
 
 				// Resume following
 				t.previewer.following.Force(t.previewOpts.follow)
-			case actGoto:
+			case actGotoFile:
 				data, err := ioutil.ReadFile(a.a)
 				if err == nil {
 					lines := strings.Split(string(data), "\n")
 					if len(lines) > 0 {
 						str := lines[0]
-						for i := t.merger.Length() - 1; i >= 0; i-- {
+                        for i := 0; i < t.merger.Length(); i++ {
 							item := t.merger.Get(i).item
 							if strings.Contains(item.AsString(t.ansi), str) {
 								t.vset(int(item.Index()))
 								req(reqPrompt, reqList, reqInfo, reqHeader)
 								break
 							}
+						}
+					}
+				}
+			case actGoto:
+				str := string(a.a)
+				if str != "" {
+					for i := 0; i < t.merger.Length(); i++ {
+						item := t.merger.Get(i).item
+						if strings.Contains(item.AsString(t.ansi), str) {
+							t.vset(int(item.Index()))
+							req(reqPrompt, reqList, reqInfo, reqHeader)
+							break
 						}
 					}
 				}
