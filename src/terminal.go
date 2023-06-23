@@ -371,6 +371,7 @@ const (
 	actGotoFile
 	actGoto
 	actGoback
+	actDisableScrollbar
 	actPreviewTop
 	actPreviewBottom
 	actPreviewUp
@@ -3638,7 +3639,7 @@ func (t *Terminal) Loop() {
 									indexBeforeGoto = int(current.Index())
 								}
 								t.vset(int(item.Index()))
-								req(reqPrompt, reqList, reqInfo, reqHeader)
+								req(reqList)
 								break
 							}
 						}
@@ -3655,7 +3656,7 @@ func (t *Terminal) Loop() {
 								indexBeforeGoto = int(current.Index())
 							}
 							t.vset(int(item.Index()))
-							req(reqPrompt, reqList, reqInfo, reqHeader)
+							req(reqList)
 							break
 						}
 					}
@@ -3667,6 +3668,10 @@ func (t *Terminal) Loop() {
 					req(reqPrompt, reqList, reqInfo, reqHeader)
 					break
 				}
+			case actDisableScrollbar:
+				t.scrollbar = ""
+				t.previewScrollbar = ""
+				req(reqFullRedraw)
 			case actNextSelected, actPrevSelected:
 				if len(t.selected) > 0 {
 					total := t.merger.Length()

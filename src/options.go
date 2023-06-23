@@ -1182,6 +1182,8 @@ func parseActionList(masked string, original string, prevActions []*action, putA
 			appendAction(actDisableSearch)
 		case "goback":
 			appendAction(actGoback)
+		case "disable-scrollbar":
+			appendAction(actDisableScrollbar)
 		case "put":
 			if putAllowed {
 				appendAction(actRune)
