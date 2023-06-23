@@ -370,6 +370,7 @@ const (
 	actChangePreviewWindow
 	actGotoFile
 	actGoto
+	actGoback
 	actPreviewTop
 	actPreviewBottom
 	actPreviewUp
@@ -2907,6 +2908,7 @@ func (t *Terminal) Loop() {
 	barDragging := false
 	pbarDragging := false
 	wasDown := false
+	indexBeforeGoto := -1
 	for looping {
 		var newCommand *string
 		var reloadSync bool
@@ -3628,9 +3630,13 @@ func (t *Terminal) Loop() {
 					lines := strings.Split(string(data), "\n")
 					if len(lines) > 0 {
 						str := lines[0]
-                        for i := 0; i < t.merger.Length(); i++ {
+						for i := 0; i < t.merger.Length(); i++ {
 							item := t.merger.Get(i).item
 							if strings.Contains(item.AsString(t.ansi), str) {
+								current := t.currentItem()
+								if current != nil {
+									indexBeforeGoto = int(current.Index())
+								}
 								t.vset(int(item.Index()))
 								req(reqPrompt, reqList, reqInfo, reqHeader)
 								break
@@ -3644,11 +3650,22 @@ func (t *Terminal) Loop() {
 					for i := 0; i < t.merger.Length(); i++ {
 						item := t.merger.Get(i).item
 						if strings.Contains(item.AsString(t.ansi), str) {
+							current := t.currentItem()
+							if current != nil {
+								indexBeforeGoto = int(current.Index())
+							}
 							t.vset(int(item.Index()))
 							req(reqPrompt, reqList, reqInfo, reqHeader)
 							break
 						}
 					}
+				}
+			case actGoback:
+				if indexBeforeGoto != -1 {
+					t.vset(indexBeforeGoto)
+					indexBeforeGoto = -1
+					req(reqPrompt, reqList, reqInfo, reqHeader)
+					break
 				}
 			case actNextSelected, actPrevSelected:
 				if len(t.selected) > 0 {
