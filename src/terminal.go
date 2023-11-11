@@ -3714,7 +3714,7 @@ func (t *Terminal) Loop() {
 				// Resume following
 				t.previewer.following.Force(t.previewOpts.follow)
 			case actGotoFile:
-				data, err := ioutil.ReadFile(a.a)
+				data, err := os.ReadFile(a.a)
 				if err == nil {
 					lines := strings.Split(string(data), "\n")
 					if len(lines) > 0 {
