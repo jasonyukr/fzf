@@ -427,6 +427,10 @@ const (
 	actPreview
 	actChangePreview
 	actChangePreviewWindow
+	actGotoFile
+	actGoto
+	actGoback
+	actDisableScrollbar
 	actPreviewTop
 	actPreviewBottom
 	actPreviewUp
@@ -3243,6 +3247,7 @@ func (t *Terminal) Loop() {
 	barDragging := false
 	pbarDragging := false
 	wasDown := false
+	indexBeforeGoto := -1
 	for looping {
 		var newCommand *string
 		var reloadSync bool
@@ -4076,6 +4081,53 @@ func (t *Terminal) Loop() {
 
 				// Resume following
 				t.previewer.following.Force(t.previewOpts.follow)
+			case actGotoFile:
+				data, err := os.ReadFile(a.a)
+				if err == nil {
+					lines := strings.Split(string(data), "\n")
+					if len(lines) > 0 {
+						str := lines[0]
+						for i := 0; i < t.merger.Length(); i++ {
+							item := t.merger.Get(i).item
+							if strings.Contains(item.AsString(t.ansi), str) {
+								current := t.currentItem()
+								if current != nil {
+									indexBeforeGoto = int(current.Index())
+								}
+								t.vset(int(item.Index()))
+								req(reqList)
+								break
+							}
+						}
+					}
+				}
+			case actGoto:
+				str := string(a.a)
+				if str != "" {
+					for i := 0; i < t.merger.Length(); i++ {
+						item := t.merger.Get(i).item
+						if strings.Contains(item.AsString(t.ansi), str) {
+							current := t.currentItem()
+							if current != nil {
+								indexBeforeGoto = int(current.Index())
+							}
+							t.vset(int(item.Index()))
+							req(reqList)
+							break
+						}
+					}
+				}
+			case actGoback:
+				if indexBeforeGoto != -1 {
+					t.vset(indexBeforeGoto)
+					indexBeforeGoto = -1
+					req(reqPrompt, reqList, reqInfo, reqHeader)
+					break
+				}
+			case actDisableScrollbar:
+				t.scrollbar = ""
+				t.previewScrollbar = ""
+				req(reqFullRedraw)
 			case actNextSelected, actPrevSelected:
 				if len(t.selected) > 0 {
 					total := t.merger.Length()
