@@ -1199,7 +1199,7 @@ const (
 
 func init() {
 	executeRegexp = regexp.MustCompile(
-		`(?si)[:+](become|execute(?:-multi|-silent)?|reload(?:-sync)?|preview|(?:change|transform)-(?:header|query|prompt|border-label|preview-label)|transform|change-(?:preview-window|preview|multi)|(?:re|un)bind|pos|put|print)`)
+		`(?si)[:+](become|execute(?:-multi|-silent)?|reload(?:-sync)?|preview|(?:change|transform)-(?:header|query|prompt|border-label|preview-label)|transform|goto-file|goto|change-(?:preview-window|preview|multi)|(?:re|un)bind|pos|put|print)`)
 	splitRegexp = regexp.MustCompile("[,:]+")
 	actionNameRegexp = regexp.MustCompile("(?i)^[a-z-]+")
 }
@@ -1439,6 +1439,10 @@ func parseActionList(masked string, original string, prevActions []*action, putA
 			appendAction(actEnableSearch)
 		case "disable-search":
 			appendAction(actDisableSearch)
+		case "goback":
+			appendAction(actGoback)
+		case "disable-scrollbar":
+			appendAction(actDisableScrollbar)
 		case "put":
 			if putAllowed {
 				appendAction(actChar)
@@ -1587,6 +1591,10 @@ func isExecuteAction(str string) actionType {
 		return actTransformPrompt
 	case "transform-query":
 		return actTransformQuery
+	case "goto-file":
+		return actGotoFile
+	case "goto":
+		return actGoto
 	}
 	return actIgnore
 }
