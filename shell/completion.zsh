@@ -189,21 +189,25 @@ __fzf_generic_path_completion() {
 }
 
 _fzf_path_completion() {
+  export FZF_PATH_MODE=
   __fzf_generic_path_completion "$1" "$2" _fzf_compgen_path \
     "-m" "" " "
 }
 
 _fzf_dir_completion() {
+  export FZF_PATH_MODE=
   __fzf_generic_path_completion "$1" "$2" _fzf_compgen_dir \
     "" "/" ""
 }
 
 _fzf_r_path_completion() {
+  export FZF_PATH_MODE=RECENT
   __fzf_generic_path_completion "$1" "$2" _fzf_compgen_r_path \
     "-m" "" " "
 }
 
 _fzf_r_dir_completion() {
+  export FZF_PATH_MODE=RECENT
   __fzf_generic_path_completion "$1" "$2" _fzf_compgen_r_dir \
     "" "/" ""
 }
