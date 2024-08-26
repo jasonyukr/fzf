@@ -204,12 +204,14 @@ _fzf_r_path_completion() {
   export FZF_PATH_MODE=RECENT
   __fzf_generic_path_completion "$1" "$2" _fzf_compgen_r_path \
     "-m" "" " "
+  export FZF_PATH_MODE=
 }
 
 _fzf_r_dir_completion() {
   export FZF_PATH_MODE=RECENT
   __fzf_generic_path_completion "$1" "$2" _fzf_compgen_r_dir \
     "" "/" ""
+  export FZF_PATH_MODE=
 }
 
 _fzf_feed_fifo() {
@@ -393,7 +395,10 @@ fzf-completion() {
     fi
     [ -n "${tokens_r[-1]}" ] && lbuf_r=${lbuf_r:0:-${#tokens_r[-1]}}
 
-    if eval "type _fzf_complete_${cmd} > /dev/null"; then
+    if eval "type _fzf_complete_r_${cmd} > /dev/null"; then
+      prefix="$prefix" eval _fzf_complete_r_${cmd} ${(q)lbuf_r}
+      zle reset-prompt
+    elif eval "type _fzf_complete_${cmd} > /dev/null"; then
       prefix="$prefix" eval _fzf_complete_${cmd} ${(q)lbuf_r}
       zle reset-prompt
     elif [ ${d_cmds[(i)$cmd]} -le ${#d_cmds} ]; then
