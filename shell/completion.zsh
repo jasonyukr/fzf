@@ -174,6 +174,7 @@ __fzf_generic_path_completion() {
         fi | while read -r item; do
           item="${item%$suffix}$suffix"
           if [[ $item == *" "* ]]; then
+            item=`echo $item | sed "s|^~|${HOME}|"`
             echo -n -E "${(q)item} "
           else
             echo -n -E "${item} "
