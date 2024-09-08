@@ -78,6 +78,35 @@ if [[ "${FZF_CTRL_T_COMMAND-x}" != "" ]]; then
   bindkey -M viins '^T' fzf-file-widget
 fi
 
+
+# CTRL-E - Paste the selected "recent" file path(s) into the command line
+__fzf_select_recent() {
+  setopt localoptions pipefail no_aliases 2> /dev/null
+  local item
+  FZF_DEFAULT_COMMAND=${FZF_CTRL_E_COMMAND:-} \
+  FZF_DEFAULT_OPTS=$(__fzf_defaults "--reverse --walker=file,dir,follow,hidden --scheme=path" "${FZF_CTRL_T_OPTS-} -m") \
+  FZF_DEFAULT_OPTS_FILE='' $(__fzfcmd) "$@" < /dev/tty | while read -r item; do
+    echo -n -E "${(q)item} "
+  done
+  local ret=$?
+  echo
+  return $ret
+}
+
+fzf-recent-widget() {
+  LBUFFER="${LBUFFER}$(__fzf_select_recent)"
+  local ret=$?
+  zle reset-prompt
+  return $ret
+}
+if [[ "${FZF_CTRL_E_COMMAND-x}" != "" ]]; then
+  zle     -N            fzf-recent-widget
+  bindkey -M emacs '^E' fzf-recent-widget
+  bindkey -M vicmd '^E' fzf-recent-widget
+  bindkey -M viins '^E' fzf-recent-widget
+fi
+
+
 # ALT-C - cd into the selected directory
 fzf-cd-widget() {
   setopt localoptions pipefail no_aliases 2> /dev/null
