@@ -84,7 +84,7 @@ __fzf_select_recent() {
   setopt localoptions pipefail no_aliases 2> /dev/null
   local item
   FZF_DEFAULT_COMMAND=${FZF_CTRL_E_COMMAND:-} \
-  FZF_DEFAULT_OPTS=$(__fzf_defaults "--reverse --walker=file,dir,follow,hidden --scheme=path" "${FZF_CTRL_T_OPTS-} -m") \
+  FZF_DEFAULT_OPTS=$(__fzf_defaults "--reverse --walker=file,dir,follow,hidden --scheme=path" "${FZF_CTRL_E_OPTS-} -m") \
   FZF_DEFAULT_OPTS_FILE='' $(__fzfcmd) "$@" < /dev/tty | while read -r item; do
     echo -n -E "${(q)item} "
   done
