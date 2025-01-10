@@ -1,6 +1,57 @@
 CHANGELOG
 =========
 
+0.57.0
+------
+- You can now resize the preview window by dragging the border
+- Built-in walker improvements
+    - `--walker-root` can take multiple directory arguments. e.g. `--walker-root include src lib`
+    - `--walker-skip` can handle multi-component patterns. e.g. `--walker-skip target/build`
+- Removed long processing delay when displaying images in the preview window
+- `FZF_PREVIEW_*` environment variables are exported to all child processes (#4098)
+- Bug fixes in fish scripts
+
+0.56.3
+------
+- Bug fixes in zsh scripts
+    - fix(zsh): handle backtick trigger edge case (#4090)
+    - revert(zsh): remove 'fc -RI' call in the history widget (#4093)
+    - Thanks to @LangLangBart for the contributions
+
+0.56.2
+------
+- Bug fixes
+    - Fixed abnormal scrolling behavior when `--wrap` is set (#4083)
+    - [zsh] Fixed warning message when `ksh_arrays` is set (#4084)
+
+0.56.1
+------
+- Bug fixes and improvements
+    - Fixed a race condition which would cause fzf to present stale results after `reload` (#4070)
+    - `page-up` and `page-down` actions now work correctly with multi-line items (#4069)
+    - `{n}` is allowed in `SCROLL` expression in `--preview-window` (#4079)
+    - [zsh] Fixed regression in history loading with shared option (#4071)
+    - [zsh] Better command extraction in zsh completion (#4082)
+- Thanks to @LangLangBart, @jaydee-coder, @alex-huff, and @vejkse for the contributions
+
+0.56.0
+------
+- Added `--gap[=N]` option to display empty lines between items.
+    - This can be useful to visually separate adjacent multi-line items.
+      ```sh
+      # All bash functions, highlighted
+      declare -f | perl -0777 -pe 's/^}\n/}\0/gm' |
+        bat --plain --language bash --color always |
+        fzf --read0 --ansi --reverse --multi --highlight-line --gap
+      ```
+    - Or just to make the list easier to read. For single-line items, you probably want to set `--color gutter:-1` as well to hide the gutter.
+      ```sh
+      fzf --info inline-right --gap --color gutter:-1
+      ```
+- Added `noinfo` option to `--preview-window` to hide the scroll indicator in the preview window
+- Bug fixes
+    - Thanks to @LangLangBart, @akinomyoga, and @charlievieth for fixing the bugs
+
 0.55.0
 ------
 _Release highlights: https://junegunn.github.io/fzf/releases/0.55.0/_

@@ -21,7 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ..
-.TH fzf 1 "Aug 2024" "fzf 0.55.0" "fzf - a command-line fuzzy finder"
+.TH fzf 1 "Dec 2024" "fzf 0.57.0" "fzf - a command-line fuzzy finder"
 
 .SH NAME
 fzf - a command-line fuzzy finder
@@ -207,6 +207,9 @@ Indicator for wrapped lines. The default is '↳ ' or '> ' depending on
 .TP
 .B "\-\-no\-multi\-line"
 Disable multi-line display of items when using \fB\-\-read0\fR
+.TP
+.BI "\-\-gap" "[=N]"
+Render empty lines between each item
 .TP
 .B "\-\-keep\-right"
 Keep the right end of the line visible when it's too long. Effective only when
@@ -756,7 +759,7 @@ default value 0 (or \fBcenter\fR) will put the label at the center of the
 border line.
 
 .TP
-.BI "\-\-preview\-window=" "[POSITION][,SIZE[%]][,border\-BORDER_OPT][,[no]wrap][,[no]follow][,[no]cycle][,[no]hidden][,+SCROLL[OFFSETS][/DENOM]][,~HEADER_LINES][,default][,<SIZE_THRESHOLD(ALTERNATIVE_LAYOUT)]"
+.BI "\-\-preview\-window=" "[POSITION][,SIZE[%]][,border\-BORDER_OPT][,[no]wrap][,[no]follow][,[no]cycle][,[no]info][,[no]hidden][,+SCROLL[OFFSETS][/DENOM]][,~HEADER_LINES][,default][,<SIZE_THRESHOLD(ALTERNATIVE_LAYOUT)]"
 
 .RS
 .B POSITION: (default: right)
@@ -790,6 +793,9 @@ e.g.
 
 * Cyclic scrolling is enabled with \fBcycle\fR flag.
 
+* To hide the scroll offset information on the top right corner, specify
+\fBnoinfo\fR.
+
 * To change the style of the border of the preview window, specify one of
 the options for \fB\-\-border\fR with \fBborder\-\fR prefix.
 e.g. \fBborder\-rounded\fR (border with rounded edges, default),
@@ -799,7 +805,7 @@ e.g. \fBborder\-rounded\fR (border with rounded edges, default),
 * \fB[:+SCROLL[OFFSETS][/DENOM]]\fR determines the initial scroll offset of the
 preview window.
 
-  - \fBSCROLL\fR can be either a numeric integer or a single-field index expression that refers to a numeric integer.
+  - \fBSCROLL\fR can be either a numeric integer or a single-field index expression that refers to a numeric integer or {n} to refer to the zero-based ordinal index of the current item.
 
   - The optional \fBOFFSETS\fR part is for adjusting the base offset. It should be given as a series of signed integers (\fB\-INTEGER\fR or \fB+INTEGER\fR).
 
@@ -999,8 +1005,8 @@ Determines the behavior of the built-in directory walker that is used when
 .br
 
 .TP
-.B "\-\-walker\-root=DIR"
-The root directory from which to start the built-in directory walker.
+.B "\-\-walker\-root=DIR [...]"
+List of directory names to start the built-in directory walker.
 The default value is the current working directory.
 
 .TP
@@ -1116,9 +1122,6 @@ fzf exports the following environment variables to its child processes.
 .br
 .BR FZF_PORT "            Port number when \-\-listen option is used"
 .br
-
-The following variables are additionally exported to the preview commands.
-
 .BR FZF_PREVIEW_TOP "     Top position of the preview window"
 .br
 .BR FZF_PREVIEW_LEFT "    Left position of the preview window"

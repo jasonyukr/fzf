@@ -56,6 +56,7 @@ Usage: fzf [options]
     --wrap                  Enable line wrap
     --wrap-sign=STR         Indicator for wrapped lines
     --no-multi-line         Disable multi-line display of items when using --read0
+    --gap[=N]               Render empty lines between each item
     --keep-right            Keep the right end of the line visible on overflow
     --scroll-off=LINES      Number of screen lines to keep above or below when
                             scrolling to the top or to the bottom (default: 0)
@@ -120,8 +121,8 @@ Usage: fzf [options]
     --preview=COMMAND       Command to preview highlighted line ({})
     --preview-window=OPT    Preview window layout (default: right:50%)
                             [up|down|left|right][,SIZE[%]]
-                            [,[no]wrap][,[no]cycle][,[no]follow][,[no]hidden]
-                            [,border-BORDER_OPT]
+                            [,[no]wrap][,[no]cycle][,[no]follow][,[no]info]
+                            [,[no]hidden][,border-BORDER_OPT]
                             [,+SCROLL[OFFSETS][/DENOM]][,~HEADER_LINES]
                             [,default][,<SIZE_THRESHOLD(ALTERNATIVE_LAYOUT)]
     --preview-label=LABEL
@@ -144,7 +145,7 @@ Usage: fzf [options]
 
   Directory traversal       (Only used when $FZF_DEFAULT_COMMAND is not set)
     --walker=OPTS           [file][,dir][,follow][,hidden] (default: file,follow,hidden)
-    --walker-root=DIR       Root directory from which to start walker (default: .)
+    --walker-root=DIR [...] List of directories to walk (default: .)
     --walker-skip=DIRS      Comma-separated list of directory names to skip
                             (default: .git,node_modules)
 
@@ -271,6 +272,7 @@ type previewOpts struct {
 	wrap        bool
 	cycle       bool
 	follow      bool
+	info        bool
 	border      tui.BorderShape
 	headerLines int
 	threshold   int
@@ -379,14 +381,46 @@ func (a previewOpts) aboveOrBelow() bool {
 	return a.size.size > 0 && (a.position == posUp || a.position == posDown)
 }
 
-func (a previewOpts) sameLayout(b previewOpts) bool {
-	return a.size == b.size && a.position == b.position && a.border == b.border && a.hidden == b.hidden && a.threshold == b.threshold &&
-		(a.alternative != nil && b.alternative != nil && a.alternative.sameLayout(*b.alternative) ||
-			a.alternative == nil && b.alternative == nil)
-}
+type previewOptsCompare int
 
-func (a previewOpts) sameContentLayout(b previewOpts) bool {
-	return a.wrap == b.wrap && a.headerLines == b.headerLines
+const (
+	previewOptsSame previewOptsCompare = iota
+	previewOptsDifferentContentLayout
+	previewOptsDifferentLayout
+)
+
+func (o *previewOpts) compare(active *previewOpts, b *previewOpts) previewOptsCompare {
+	a := o
+
+	sameThreshold := o.position == b.position && o.threshold == b.threshold
+	// Alternative layout is being used
+	if o.alternative == active {
+		a = active
+
+		// If the other also has an alternative layout,
+		if b.alternative != nil {
+			// and if the same condition is the same, compare alt vs. alt.
+			if sameThreshold {
+				b = b.alternative
+			} else {
+				// If not, we pessimistically decide that the layouts may not be the same
+				return previewOptsDifferentLayout
+			}
+		}
+	} else if b.alternative != nil && !sameThreshold {
+		// We may choose the other's alternative layout, so let's be conservative.
+		return previewOptsDifferentLayout
+	}
+
+	if !(a.size == b.size && a.position == b.position && a.border == b.border && a.hidden == b.hidden) {
+		return previewOptsDifferentLayout
+	}
+
+	if a.wrap == b.wrap && a.headerLines == b.headerLines && a.info == b.info && a.scroll == b.scroll {
+		return previewOptsSame
+	}
+
+	return previewOptsDifferentContentLayout
 }
 
 func firstLine(s string) string {
@@ -472,6 +506,7 @@ type Options struct {
 	Header       []string
 	HeaderLines  int
 	HeaderFirst  bool
+	Gap          int
 	Ellipsis     *string
 	Scrollbar    *string
 	Margin       [4]sizeSpec
@@ -487,7 +522,7 @@ type Options struct {
 	Unsafe       bool
 	ClearOnExit  bool
 	WalkerOpts   walkerOpts
-	WalkerRoot   string
+	WalkerRoot   []string
 	WalkerSkip   []string
 	Version      bool
 	Help         bool
@@ -508,7 +543,7 @@ func filterNonEmpty(input []string) []string {
 }
 
 func defaultPreviewOpts(command string) previewOpts {
-	return previewOpts{command, posRight, sizeSpec{50, true}, "", false, false, false, false, tui.DefaultBorderShape, 0, 0, nil}
+	return previewOpts{command, posRight, sizeSpec{50, true}, "", false, false, false, false, true, tui.DefaultBorderShape, 0, 0, nil}
 }
 
 func defaultOptions() *Options {
@@ -578,6 +613,7 @@ func defaultOptions() *Options {
 		Header:       make([]string, 0),
 		HeaderLines:  0,
 		HeaderFirst:  false,
+		Gap:          0,
 		Ellipsis:     nil,
 		Scrollbar:    nil,
 		Margin:       defaultMargin(),
@@ -590,7 +626,7 @@ func defaultOptions() *Options {
 		Unsafe:       false,
 		ClearOnExit:  true,
 		WalkerOpts:   walkerOpts{file: true, hidden: true, follow: true},
-		WalkerRoot:   ".",
+		WalkerRoot:   []string{"."},
 		WalkerSkip:   []string{".git", "node_modules"},
 		Help:         false,
 		Version:      false}
@@ -620,6 +656,28 @@ func optionalNextString(args []string, i *int) (bool, string) {
 		return true, args[*i]
 	}
 	return false, ""
+}
+
+func isDir(path string) bool {
+	stat, err := os.Stat(path)
+	return err == nil && stat.IsDir()
+}
+
+func nextDirs(args []string, i *int) ([]string, error) {
+	dirs := []string{}
+	for *i < len(args)-1 {
+		arg := args[*i+1]
+		if isDir(arg) {
+			dirs = append(dirs, arg)
+			*i++
+		} else {
+			break
+		}
+	}
+	if len(dirs) == 0 {
+		return nil, errors.New("no directory specified")
+	}
+	return dirs, nil
 }
 
 func atoi(str string) (int, error) {
@@ -1730,7 +1788,7 @@ func parsePreviewWindowImpl(opts *previewOpts, input string) error {
 	var err error
 	tokenRegex := regexp.MustCompile(`[:,]*(<([1-9][0-9]*)\(([^)<]+)\)|[^,:]+)`)
 	sizeRegex := regexp.MustCompile("^[0-9]+%?$")
-	offsetRegex := regexp.MustCompile(`^(\+{-?[0-9]+})?([+-][0-9]+)*(-?/[1-9][0-9]*)?$`)
+	offsetRegex := regexp.MustCompile(`^(\+{(-?[0-9]+|n)})?([+-][0-9]+)*(-?/[1-9][0-9]*)?$`)
 	headerRegex := regexp.MustCompile("^~(0|[1-9][0-9]*)$")
 	tokens := tokenRegex.FindAllStringSubmatch(input, -1)
 	var alternative string
@@ -1797,6 +1855,10 @@ func parsePreviewWindowImpl(opts *previewOpts, input string) error {
 			opts.follow = true
 		case "nofollow":
 			opts.follow = false
+		case "info":
+			opts.info = true
+		case "noinfo":
+			opts.info = false
 		default:
 			if headerRegex.MatchString(token) {
 				if opts.headerLines, err = atoi(token[1:]); err != nil {
@@ -2346,6 +2408,12 @@ func parseOptions(index *int, opts *Options, allArgs []string) error {
 			opts.HeaderFirst = true
 		case "--no-header-first":
 			opts.HeaderFirst = false
+		case "--gap":
+			if opts.Gap, err = optionalNumeric(allArgs, &i, 1); err != nil {
+				return err
+			}
+		case "--no-gap":
+			opts.Gap = 0
 		case "--ellipsis":
 			str, err := nextString(allArgs, &i, "ellipsis string required")
 			if err != nil {
@@ -2481,7 +2549,7 @@ func parseOptions(index *int, opts *Options, allArgs []string) error {
 				return err
 			}
 		case "--walker-root":
-			if opts.WalkerRoot, err = nextString(allArgs, &i, "directory required"); err != nil {
+			if opts.WalkerRoot, err = nextDirs(allArgs, &i); err != nil {
 				return err
 			}
 		case "--walker-skip":
@@ -2633,6 +2701,10 @@ func parseOptions(index *int, opts *Options, allArgs []string) error {
 				if opts.HeaderLines, err = atoi(value); err != nil {
 					return err
 				}
+			} else if match, value := optString(arg, "--gap="); match {
+				if opts.Gap, err = atoi(value); err != nil {
+					return err
+				}
 			} else if match, value := optString(arg, "--ellipsis="); match {
 				str := firstLine(value)
 				opts.Ellipsis = &str
@@ -2675,7 +2747,11 @@ func parseOptions(index *int, opts *Options, allArgs []string) error {
 					return err
 				}
 			} else if match, value := optString(arg, "--walker-root="); match {
-				opts.WalkerRoot = value
+				if !isDir(value) {
+					return errors.New("not a directory: " + value)
+				}
+				dirs, _ := nextDirs(allArgs, &i)
+				opts.WalkerRoot = append([]string{value}, dirs...)
 			} else if match, value := optString(arg, "--walker-skip="); match {
 				opts.WalkerSkip = filterNonEmpty(strings.Split(value, ","))
 			} else if match, value := optString(arg, "--hscroll-off="); match {
