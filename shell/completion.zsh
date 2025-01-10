@@ -182,13 +182,29 @@ __fzf_generic_path_completion() {
 }
 
 _fzf_path_completion() {
+  export FZF_PATH_MODE=
   __fzf_generic_path_completion "$1" "$2" _fzf_compgen_path \
     "-m" "" " "
 }
 
 _fzf_dir_completion() {
+  export FZF_PATH_MODE=
   __fzf_generic_path_completion "$1" "$2" _fzf_compgen_dir \
     "" "/" ""
+}
+
+_fzf_r_path_completion() {
+  export FZF_PATH_MODE=RECENT
+  __fzf_generic_path_completion "$1" "$2" _fzf_compgen_r_path \
+    "-m" "" " "
+  export FZF_PATH_MODE=
+}
+
+_fzf_r_dir_completion() {
+  export FZF_PATH_MODE=RECENT
+  __fzf_generic_path_completion "$1" "$2" _fzf_compgen_r_dir \
+    "" "/" ""
+  export FZF_PATH_MODE=
 }
 
 _fzf_feed_fifo() {
@@ -303,11 +319,17 @@ _fzf_complete_kill_post() {
 
 fzf-completion() {
   local tokens prefix trigger tail matches lbuf d_cmds cursor_pos cmd_word
+  #----------------------------------------------[[[
+  local tokens_r trigger_r tail_r lbuf_r
+  #----------------------------------------------]]]
   setopt localoptions noshwordsplit noksh_arrays noposixbuiltins
 
   # http://zsh.sourceforge.net/FAQ/zshfaq03.html
   # http://zsh.sourceforge.net/Doc/Release/Expansion.html#Parameter-Expansion-Flags
   tokens=(${(z)LBUFFER})
+  #----------------------------------------------[[[
+  tokens_r=(${(z)LBUFFER})
+  #----------------------------------------------]]]
   if [ ${#tokens} -lt 1 ]; then
     zle ${fzf_default_completion:-expand-or-complete}
     return
@@ -325,6 +347,23 @@ fzf-completion() {
 
   lbuf=$LBUFFER
   tail=${LBUFFER:$(( ${#LBUFFER} - ${#trigger} ))}
+
+  #----------------------------------------------[[[
+  # DUPLICATED BLOCK OF ABOVE.
+  # trigger -> trigger_r. tokens -> tokens_r. lbuf -> lbuf->r. tail -> tail_r
+  # Explicitly allow for empty trigger.
+  trigger_r=${FZF_R_COMPLETION_TRIGGER-'##'}
+  [ -z "$trigger_r" -a ${LBUFFER[-1]} = ' ' ] && tokens_r+=("")
+
+  # When the trigger starts with ';', it becomes a separate token
+  if [[ ${LBUFFER} = *"${tokens_r[-2]-}${tokens_r[-1]}" ]]; then
+    tokens_r[-2]="${tokens_r[-2]-}${tokens_r[-1]}"
+    tokens_r=(${tokens_r[0,-2]})
+  fi
+
+  lbuf_r=$LBUFFER
+  tail_r=${LBUFFER:$(( ${#LBUFFER} - ${#trigger_r} ))}
+  #----------------------------------------------]]]
 
   # Trigger sequence given
   if [ ${#tokens} -gt 1 -a "$tail" = "$trigger" ]; then
@@ -365,6 +404,49 @@ fzf-completion() {
     else
       _fzf_path_completion "$prefix" "$lbuf"
     fi
+  #----------------------------------------------[[[
+  # DUPLICATED BLOCK OF ABOVE.
+  # trigger -> trigger_r. tokens -> tokens_r. lbuf -> lbuf->r. tail -> tail_r
+  # _fzf_complete_${cmd_word} -> _fzf_complete_r_${cmd_word}
+  elif [ ${#tokens_r} -gt 1 -a "$tail_r" = "$trigger_r" ]; then
+    d_cmds=(${=FZF_COMPLETION_DIR_COMMANDS-cd pushd rmdir})
+
+    {
+      cursor_pos=$CURSOR
+      # Move the cursor before the trigger_r to preserve word array elements when
+      # trigger_r chars like ';' or '`' would otherwise reset the 'words' array.
+      CURSOR=$((cursor_pos - ${#trigger_r} - 1))
+      # Check if at least one completion system (old or new) is active.
+      # If at least one user-defined completion widget is detected, nothing will
+      # be completed if neither the old nor the new completion system is enabled.
+      # In such cases, the 'zsh/compctl' module is loaded as a fallback.
+      if ! zmodload -F zsh/parameter p:functions 2>/dev/null || ! (( ${+functions[compdef]} )); then
+        zmodload -F zsh/compctl 2>/dev/null
+      fi
+      # Create a completion widget to access the 'words' array (man zshcompwid)
+      zle -C __fzf_extract_command .complete-word __fzf_extract_command
+      zle __fzf_extract_command
+    } always {
+      CURSOR=$cursor_pos
+      # Delete the completion widget
+      zle -D __fzf_extract_command  2>/dev/null
+    }
+
+    [ -z "$trigger_r"      ] && prefix=${tokens_r[-1]} || prefix=${tokens_r[-1]:0:-${#trigger_r}}
+    if [[ $prefix = *'$('* ]] || [[ $prefix = *'<('* ]] || [[ $prefix = *'>('* ]] || [[ $prefix = *':='* ]] || [[ $prefix = *'`'* ]]; then
+      return
+    fi
+    [ -n "${tokens_r[-1]}" ] && lbuf_r=${lbuf_r:0:-${#tokens_r[-1]}}
+
+    if eval "noglob type _fzf_complete_r_${cmd_word} >/dev/null"; then
+      prefix="$prefix" eval _fzf_complete_r_${cmd_word} ${(q)lbuf_r}
+      zle reset-prompt
+    elif [ ${d_cmds[(i)$cmd_word]} -le ${#d_cmds} ]; then
+      _fzf_dir_completion "$prefix" "$lbuf_r"
+    else
+      _fzf_path_completion "$prefix" "$lbuf_r"
+    fi
+  #----------------------------------------------]]]
   # Fall back to default completion
   else
     zle ${fzf_default_completion:-expand-or-complete}
