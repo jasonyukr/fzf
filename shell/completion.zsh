@@ -413,6 +413,8 @@ fzf-completion() {
   # DUPLICATED BLOCK OF ABOVE.
   # trigger -> trigger_r. tokens -> tokens_r. lbuf -> lbuf->r. tail -> tail_r
   # _fzf_complete_${cmd_word} -> _fzf_complete_r_${cmd_word}
+  # _fzf_dir_completion -> _fzf_r_dir_completion
+  # _fzf_path_completion -> _fzf_r_path_completion
   elif [ ${#tokens_r} -gt 1 -a "$tail_r" = "$trigger_r" ]; then
     d_cmds=(${=FZF_COMPLETION_DIR_COMMANDS-cd pushd rmdir})
 
@@ -447,9 +449,9 @@ fzf-completion() {
       prefix="$prefix" eval _fzf_complete_r_${cmd_word} ${(q)lbuf_r}
       zle reset-prompt
     elif [ ${d_cmds[(i)$cmd_word]} -le ${#d_cmds} ]; then
-      _fzf_dir_completion "$prefix" "$lbuf_r"
+      _fzf_r_dir_completion "$prefix" "$lbuf_r"
     else
-      _fzf_path_completion "$prefix" "$lbuf_r"
+      _fzf_r_path_completion "$prefix" "$lbuf_r"
     fi
   #----------------------------------------------]]]
   # Fall back to default completion
