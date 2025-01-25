@@ -392,7 +392,7 @@ fzf-completion() {
   # DUPLICATED BLOCK OF ABOVE.
   # trigger -> trigger_s. tokens -> tokens_s. lbuf -> lbuf_s. tail -> tail_s
   # Explicitly allow for empty trigger.
-  trigger_s=${FZF_R_COMPLETION_TRIGGER-'%%'}
+  trigger_s=${FZF_S_COMPLETION_TRIGGER-'%%'}
   [ -z "$trigger_s" -a ${LBUFFER[-1]} = ' ' ] && tokens_s+=("")
 
   # When the trigger starts with ';', it becomes a separate token
