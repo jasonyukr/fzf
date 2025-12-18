@@ -217,6 +217,36 @@ _fzf_dir_completion() {
     "" "/" ""
 }
 
+#----------------------------------------------[[[
+_fzf_s_one_path_completion() {
+  export FZF_PATH_MODE=SORTR_ONE
+  __fzf_generic_path_completion "$1" "$2" _fzf_compgen_s_one_path \
+    "-m" "" " "
+  export FZF_PATH_MODE=
+}
+
+_fzf_s_one_dir_completion() {
+  export FZF_PATH_MODE=SORTR_ONE
+  __fzf_generic_path_completion "$1" "$2" _fzf_compgen_s_one_dir \
+    "" "/" ""
+  export FZF_PATH_MODE=
+}
+
+_fzf_s_all_path_completion() {
+  export FZF_PATH_MODE=SORTR_ALL
+  __fzf_generic_path_completion "$1" "$2" _fzf_compgen_s_all_path \
+    "-m" "" " "
+  export FZF_PATH_MODE=
+}
+
+_fzf_s_all_dir_completion() {
+  export FZF_PATH_MODE=SORTR_ALL
+  __fzf_generic_path_completion "$1" "$2" _fzf_compgen_s_all_dir \
+    "" "/" ""
+  export FZF_PATH_MODE=
+}
+#----------------------------------------------]]]
+
 _fzf_feed_fifo() {
   command rm -f "$1"
   mkfifo "$1"
@@ -417,6 +447,35 @@ fzf-completion() {
   lbuf=$LBUFFER
   tail=${LBUFFER:$(( ${#LBUFFER} - ${#trigger} ))}
 
+  #----------------------------------------------[[[
+  # ==== BEGIN FZF CUSTOM TRIGGERS (S_ALL/S_ONE) PRE-DETECT ====
+
+  local trigger_s_all=${FZF_S_ALL_COMPLETION_TRIGGER-'##'}
+  local tail_s_all=${LBUFFER:$(( ${#LBUFFER} - ${#trigger_s_all} ))}
+  local trigger_s_one=${FZF_S_ONE_COMPLETION_TRIGGER-'#'}
+  local tail_s_one=${LBUFFER:$(( ${#LBUFFER} - ${#trigger_s_one} ))}
+
+  # Decide which S_* trigger matched (pure detection; no side effects)
+  local s_trigger=
+  local s_active_trigger=
+  if [ ${#tokens} -gt 1 -a "$tail_s_all" = "$trigger_s_all" ]; then
+    s_active_trigger="$trigger_s_all"
+  elif [ ${#tokens} -gt 1 -a "$tail_s_one" = "$trigger_s_one" ]; then
+    s_active_trigger="$trigger_s_one"
+  fi
+
+  # Precompute base tokenization for S_* (no empty-trigger handling here)
+  local -a s_base_tokens
+  s_base_tokens=(${(z)LBUFFER})
+
+  # Finalized tokens for S_* triggers (apply empty-trigger rule only here)
+  local -a s_tokens
+  s_tokens=(${s_base_tokens[@]})
+  [[ -z $s_active_trigger && ${LBUFFER[-1]} == ' ' ]] && s_tokens+=("")
+
+  # ==== END FZF CUSTOM TRIGGERS (S_ALL/S_ONE) PRE-DETECT ====
+  #----------------------------------------------]]]
+
   # Trigger sequence given
   if [ ${#tokens} -gt 1 -a "$tail" = "$trigger" ]; then
     d_cmds=(${=FZF_COMPLETION_DIR_COMMANDS-cd pushd rmdir})
@@ -456,6 +515,63 @@ fzf-completion() {
     else
       _fzf_path_completion "$prefix" "$lbuf"
     fi
+
+  #----------------------------------------------[[[
+  # ==== BEGIN FZF CUSTOM TRIGGERS (S_ALL/S_ONE) ====
+  # Mapping: active_trigger=(trigger_s_all|trigger_s_one), user_fn_prefix=(_fzf_complete_s_all_|_fzf_complete_s_one_), dir_fn/path_fn=(_fzf_s_all_*|_fzf_s_one_*)
+  # Note: Only empty-trigger handling is applied for S_* triggers (no ';'-leading semantics)
+  elif [ -n "$s_active_trigger" ]; then
+    d_cmds=(${=FZF_COMPLETION_DIR_COMMANDS-cd pushd rmdir})
+
+    {
+      cursor_pos=$CURSOR
+      # Move the cursor before the trigger to preserve word array elements when
+      # trigger chars like ';' or '`' would otherwise reset the 'words' array.
+      s_trigger="$s_active_trigger"
+      CURSOR=$((cursor_pos - ${#s_trigger} - 1))
+      # Check if at least one completion system (old or new) is active.
+      # If at least one user-defined completion widget is detected, nothing will
+      # be completed if neither the old nor the new completion system is enabled.
+      # In such cases, the 'zsh/compctl' module is loaded as a fallback.
+      if ! zmodload -F zsh/parameter p:functions 2>/dev/null || ! (( ${+functions[compdef]} )); then
+        zmodload -F zsh/compctl 2>/dev/null
+      fi
+      # Create a completion widget to access the 'words' array (man zshcompwid)
+      zle -C __fzf_extract_command .complete-word __fzf_extract_command
+      zle __fzf_extract_command
+    } always {
+      CURSOR=$cursor_pos
+      # Delete the completion widget
+      zle -D __fzf_extract_command  2>/dev/null
+    }
+
+    [ -z "$s_trigger"    ] && prefix=${s_tokens[-1]} || prefix=${s_tokens[-1]:0:-${#s_trigger}}
+    if [[ $prefix = *'$('* ]] || [[ $prefix = *'<('* ]] || [[ $prefix = *'>('* ]] || [[ $prefix = *':='* ]] || [[ $prefix = *'`'* ]]; then
+      return
+    fi
+    [ -n "${s_tokens[-1]}" ] && lbuf_local=${LBUFFER:0:-${#s_tokens[-1]}} || lbuf_local=$LBUFFER
+
+    if [ "$s_trigger" = "$trigger_s_all" ]; then
+      user_fn_prefix=_fzf_complete_s_all_
+      dir_fn=_fzf_s_all_dir_completion
+      path_fn=_fzf_s_all_path_completion
+    else
+      user_fn_prefix=_fzf_complete_s_one_
+      dir_fn=_fzf_s_one_dir_completion
+      path_fn=_fzf_s_one_path_completion
+    fi
+
+    if eval "noglob type ${user_fn_prefix}${cmd_word} >/dev/null"; then
+      prefix="$prefix" eval ${user_fn_prefix}${cmd_word} ${(q)lbuf_local}
+      zle reset-prompt
+    elif [ ${d_cmds[(i)$cmd_word]} -le ${#d_cmds} ]; then
+      "$dir_fn" "$prefix" "$lbuf_local"
+    else
+      "$path_fn" "$prefix" "$lbuf_local"
+    fi
+  # ==== END FZF CUSTOM TRIGGERS (S_ALL/S_ONE) ====
+  #----------------------------------------------]]]
+
   # Fall back to default completion
   else
     zle ${fzf_default_completion:-expand-or-complete}
