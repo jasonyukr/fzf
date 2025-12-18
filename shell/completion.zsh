@@ -457,11 +457,10 @@ fzf-completion() {
 
   # Decide which S_* trigger matched (pure detection; no side effects)
   local s_trigger=
-  local s_active_trigger=
   if [ ${#tokens} -gt 1 -a "$tail_s_all" = "$trigger_s_all" ]; then
-    s_active_trigger="$trigger_s_all"
+    s_trigger="$trigger_s_all"
   elif [ ${#tokens} -gt 1 -a "$tail_s_one" = "$trigger_s_one" ]; then
-    s_active_trigger="$trigger_s_one"
+    s_trigger="$trigger_s_one"
   fi
 
   # Precompute base tokenization for S_* (no empty-trigger handling here)
@@ -471,7 +470,7 @@ fzf-completion() {
   # Finalized tokens for S_* triggers (apply empty-trigger rule only here)
   local -a s_tokens
   s_tokens=(${s_base_tokens[@]})
-  [[ -z $s_active_trigger && ${LBUFFER[-1]} == ' ' ]] && s_tokens+=("")
+  [[ -z $s_trigger && ${LBUFFER[-1]} == ' ' ]] && s_tokens+=("")
 
   # ==== END FZF CUSTOM TRIGGERS (S_ALL/S_ONE) PRE-DETECT ====
   #----------------------------------------------]]]
@@ -520,14 +519,13 @@ fzf-completion() {
   # ==== BEGIN FZF CUSTOM TRIGGERS (S_ALL/S_ONE) ====
   # Mapping: active_trigger=(trigger_s_all|trigger_s_one), user_fn_prefix=(_fzf_complete_s_all_|_fzf_complete_s_one_), dir_fn/path_fn=(_fzf_s_all_*|_fzf_s_one_*)
   # Note: Only empty-trigger handling is applied for S_* triggers (no ';'-leading semantics)
-  elif [ -n "$s_active_trigger" ]; then
+  elif [ -n "$s_trigger" ]; then
     d_cmds=(${=FZF_COMPLETION_DIR_COMMANDS-cd pushd rmdir})
 
     {
       cursor_pos=$CURSOR
       # Move the cursor before the trigger to preserve word array elements when
       # trigger chars like ';' or '`' would otherwise reset the 'words' array.
-      s_trigger="$s_active_trigger"
       CURSOR=$((cursor_pos - ${#s_trigger} - 1))
       # Check if at least one completion system (old or new) is active.
       # If at least one user-defined completion widget is detected, nothing will
