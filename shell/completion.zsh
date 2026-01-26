@@ -187,7 +187,14 @@ __fzf_generic_path_completion() {
           __fzf_comprun "$cmd_word" ${(Q)${(Z+n+)fzf_opts}} -q "$leftover" --walker "$walker" --walker-root="$dir" ${(Q)${(Z+n+)rest}} < /dev/tty
         fi | while read -r item; do
           item="${item%$suffix}$suffix"
-          echo -n -E "${(q)item} "
+          # If the item contains spaces, expand leading ~ to $HOME and quote
+          if [[ $item == *" "* ]]; then
+            item=$(printf '%s\n' "$item" | sed "s|^~|${HOME}|")
+            echo -n -E "${(q)item} "
+          else
+            # Keep literal ~ when there is no space in the item
+            echo -n -E "${item} "
+          fi
         done
       )
       matches=${matches% }
@@ -211,6 +218,26 @@ _fzf_dir_completion() {
   __fzf_generic_path_completion "$1" "$2" _fzf_compgen_dir \
     "" "/" ""
 }
+
+
+#----------------------------------------------[[[
+# S_ONE/S_ALL helpers (scope FZF_PATH_MODE only for this call)
+_fzf_s_one_path_completion() {
+  FZF_PATH_MODE=SORTR_ONE __fzf_generic_path_completion "$1" "$2" _fzf_compgen_s_one_path     "-m" "" " "
+}
+
+_fzf_s_one_dir_completion() {
+  FZF_PATH_MODE=SORTR_ONE __fzf_generic_path_completion "$1" "$2" _fzf_compgen_s_one_dir     "" "/" ""
+}
+
+_fzf_s_all_path_completion() {
+  FZF_PATH_MODE=SORTR_ALL __fzf_generic_path_completion "$1" "$2" _fzf_compgen_s_all_path     "-m" "" " "
+}
+
+_fzf_s_all_dir_completion() {
+  FZF_PATH_MODE=SORTR_ALL __fzf_generic_path_completion "$1" "$2" _fzf_compgen_s_all_dir     "" "/" ""
+}
+#----------------------------------------------]]]
 
 _fzf_feed_fifo() {
   command rm -f "$1"
@@ -410,50 +437,98 @@ fzf-completion() {
   fi
 
   lbuf=$LBUFFER
+  local base_lbuf=$LBUFFER
   tail=${LBUFFER:$(( ${#LBUFFER} - ${#trigger} ))}
 
+  #----------------------------------------------[[[
+  local trigger_s_all=${FZF_S_ALL_COMPLETION_TRIGGER-'##'}
+  local trigger_s_one=${FZF_S_ONE_COMPLETION_TRIGGER-'#'}
+  local tail_s_all=${LBUFFER:$(( ${#LBUFFER} - ${#trigger_s_all} ))}
+  local tail_s_one=${LBUFFER:$(( ${#LBUFFER} - ${#trigger_s_one} ))}
+
+  # Decide which S_* trigger matched (pure detection; no side effects)
+  local s_trigger=
+  if [ ${#tokens} -gt 1 -a "$tail_s_all" = "$trigger_s_all" ]; then
+    s_trigger="$trigger_s_all"
+  elif [ ${#tokens} -gt 1 -a "$tail_s_one" = "$trigger_s_one" ]; then
+    s_trigger="$trigger_s_one"
+  fi
+
+  # Precompute base tokenization for S_* (no empty-trigger handling here)
+  local -a s_base_tokens
+  s_base_tokens=(${(z)LBUFFER})
+
+  # Finalized tokens for S_* triggers (apply empty-trigger rule only here)
+  local -a s_tokens
+  s_tokens=(${s_base_tokens[@]})
+  [[ -z $s_trigger && ${LBUFFER[-1]} == ' ' ]] && s_tokens+=("")
+
+  # Decide active(act) flow
   # Trigger sequence given
+  local act_trigger act_dir_fn act_path_fn act_user_fn_prefix
+  local -a act_tokens
+  local act_lbuf
   if [ ${#tokens} -gt 1 -a "$tail" = "$trigger" ]; then
-    d_cmds=(${=FZF_COMPLETION_DIR_COMMANDS-cd pushd rmdir})
-
-    {
-      cursor_pos=$CURSOR
-      # Move the cursor before the trigger to preserve word array elements when
-      # trigger chars like ';' or '`' would otherwise reset the 'words' array.
-      CURSOR=$((cursor_pos - ${#trigger} - 1))
-      # Check if at least one completion system (old or new) is active.
-      # If at least one user-defined completion widget is detected, nothing will
-      # be completed if neither the old nor the new completion system is enabled.
-      # In such cases, the 'zsh/compctl' module is loaded as a fallback.
-      if ! zmodload -F zsh/parameter p:functions 2>/dev/null || ! (( ${+functions[compdef]} )); then
-        zmodload -F zsh/compctl 2>/dev/null
-      fi
-      # Create a completion widget to access the 'words' array (man zshcompwid)
-      zle -C __fzf_extract_command .complete-word __fzf_extract_command
-      zle __fzf_extract_command
-    } always {
-      CURSOR=$cursor_pos
-      # Delete the completion widget
-      zle -D __fzf_extract_command  2>/dev/null
-    }
-
-    [ -z "$trigger"      ] && prefix=${tokens[-1]} || prefix=${tokens[-1]:0:-${#trigger}}
-    if [[ $prefix = *'$('* ]] || [[ $prefix = *'<('* ]] || [[ $prefix = *'>('* ]] || [[ $prefix = *':='* ]] || [[ $prefix = *'`'* ]]; then
-      return
-    fi
-    [ -n "${tokens[-1]}" ] && lbuf=${lbuf:0:-${#tokens[-1]}}
-
-    if eval "noglob type _fzf_complete_${cmd_word} >/dev/null"; then
-      prefix="$prefix" eval _fzf_complete_${cmd_word} ${(q)lbuf}
-      zle reset-prompt
-    elif [ ${d_cmds[(i)$cmd_word]} -le ${#d_cmds} ]; then
-      _fzf_dir_completion "$prefix" "$lbuf"
+    act_trigger="$trigger"
+    act_tokens=(${tokens[@]})
+    act_dir_fn=_fzf_dir_completion
+    act_path_fn=_fzf_path_completion
+    act_user_fn_prefix=_fzf_complete_
+  elif [ -n "$s_trigger" ]; then
+    act_trigger="$s_trigger"
+    act_tokens=(${s_tokens[@]})
+    if [ "$s_trigger" = "$trigger_s_all" ]; then
+      act_dir_fn=_fzf_s_all_dir_completion
+      act_path_fn=_fzf_s_all_path_completion
+      act_user_fn_prefix=_fzf_complete_s_all_
     else
-      _fzf_path_completion "$prefix" "$lbuf"
+      act_dir_fn=_fzf_s_one_dir_completion
+      act_path_fn=_fzf_s_one_path_completion
+      act_user_fn_prefix=_fzf_complete_s_one_
     fi
-  # Fall back to default completion
   else
+    # Fall back to default completion
     zle ${fzf_default_completion:-expand-or-complete}
+    return
+  fi
+  #----------------------------------------------]]]
+
+  d_cmds=(${=FZF_COMPLETION_DIR_COMMANDS-cd pushd rmdir})
+
+  {
+    cursor_pos=$CURSOR
+    # Move the cursor before the trigger to preserve word array elements when
+    # trigger chars like ';' or '`' would otherwise reset the 'words' array.
+    CURSOR=$((cursor_pos - ${#act_trigger} - 1))
+    # Check if at least one completion system (old or new) is active.
+    # If at least one user-defined completion widget is detected, nothing will
+    # be completed if neither the old nor the new completion system is enabled.
+    # In such cases, the 'zsh/compctl' module is loaded as a fallback.
+    if ! zmodload -F zsh/parameter p:functions 2>/dev/null || ! (( ${+functions[compdef]} )); then
+      zmodload -F zsh/compctl 2>/dev/null
+    fi
+    # Create a completion widget to access the 'words' array (man zshcompwid)
+    zle -C __fzf_extract_command .complete-word __fzf_extract_command
+    zle __fzf_extract_command
+  } always {
+    CURSOR=$cursor_pos
+    # Delete the completion widget
+    zle -D __fzf_extract_command  2>/dev/null
+  }
+
+  [ -z "$act_trigger" ] && prefix=${act_tokens[-1]} || prefix=${act_tokens[-1]:0:-${#act_trigger}}
+  if [[ $prefix = *'$('* ]] || [[ $prefix = *'<('* ]] || [[ $prefix = *'>('* ]] || [[ $prefix = *':='* ]] || [[ $prefix = *'`'* ]]; then
+    return
+  fi
+  [ -n "${act_tokens[-1]}" ] && act_lbuf=${base_lbuf:0:-${#act_tokens[-1]}} || act_lbuf=$base_lbuf
+
+  if eval "noglob type ${act_user_fn_prefix}${cmd_word} >/dev/null"; then
+    prefix="$prefix" eval ${act_user_fn_prefix}${cmd_word} ${(q)act_lbuf}
+    zle reset-prompt
+  elif [ ${d_cmds[(i)$cmd_word]} -le ${#d_cmds} ]; then
+    "$act_dir_fn" "$prefix" "$act_lbuf"
+  else
+    "$act_path_fn" "$prefix" "$act_lbuf"
   fi
 }
 
