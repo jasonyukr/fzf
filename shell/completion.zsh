@@ -187,7 +187,12 @@ __fzf_generic_path_completion() {
           __fzf_comprun "$cmd_word" ${(Q)${(Z+n+)fzf_opts}} -q "$leftover" --walker "$walker" --walker-root="$dir" ${(Q)${(Z+n+)rest}} < /dev/tty
         fi | while read -r item; do
           item="${item%$suffix}$suffix"
-          echo -n -E "${(q)item} "
+          if [[ $item == *" "* ]]; then
+            item="${item/#\~/${HOME}}"
+            echo -n -E "${(q)item} "
+          else
+            echo -n -E "${item} "
+          fi
         done
       )
       matches=${matches% }
@@ -210,6 +215,89 @@ _fzf_path_completion() {
 _fzf_dir_completion() {
   __fzf_generic_path_completion "$1" "$2" _fzf_compgen_dir \
     "" "/" ""
+}
+
+_fzf_s_one_path_completion() {
+  FZF_PATH_MODE=SORTR_ONE __fzf_generic_path_completion "$1" "$2" _fzf_compgen_s_one_path \
+    "-m" "" " "
+}
+
+_fzf_s_one_dir_completion() {
+  FZF_PATH_MODE=SORTR_ONE __fzf_generic_path_completion "$1" "$2" _fzf_compgen_s_one_dir \
+    "" "/" ""
+}
+
+_fzf_s_all_path_completion() {
+  FZF_PATH_MODE=SORTR_ALL __fzf_generic_path_completion "$1" "$2" _fzf_compgen_s_all_path \
+    "-m" "" " "
+}
+
+_fzf_s_all_dir_completion() {
+  FZF_PATH_MODE=SORTR_ALL __fzf_generic_path_completion "$1" "$2" _fzf_compgen_s_all_dir \
+    "" "/" ""
+}
+
+# S_ALL/S_ONE custom trigger handler.
+# Called from fzf-completion; accesses parent-scope locals via zsh dynamic scoping:
+#   tokens, d_cmds, cursor_pos, cmd_word, prefix, lbuf (all declared in fzf-completion)
+__fzf_s_trigger_completion() {
+  local trigger_s_all=${FZF_S_ALL_COMPLETION_TRIGGER-'##'}
+  local trigger_s_one=${FZF_S_ONE_COMPLETION_TRIGGER-'#'}
+  local tail_s_all=${LBUFFER:$(( ${#LBUFFER} - ${#trigger_s_all} ))}
+  local tail_s_one=${LBUFFER:$(( ${#LBUFFER} - ${#trigger_s_one} ))}
+
+  local s_trigger=
+  if [ ${#tokens} -gt 1 -a "$tail_s_all" = "$trigger_s_all" ]; then
+    s_trigger=$trigger_s_all
+  elif [ ${#tokens} -gt 1 -a "$tail_s_one" = "$trigger_s_one" ]; then
+    s_trigger=$trigger_s_one
+  fi
+  [ -z "$s_trigger" ] && return 1
+
+  d_cmds=(${=FZF_COMPLETION_DIR_COMMANDS-cd pushd rmdir})
+
+  local -a s_tokens
+  s_tokens=(${(z)LBUFFER})
+
+  {
+    cursor_pos=$CURSOR
+    CURSOR=$((cursor_pos - ${#s_trigger} - 1))
+    if ! zmodload -F zsh/parameter p:functions 2>/dev/null || ! (( ${+functions[compdef]} )); then
+      zmodload -F zsh/compctl 2>/dev/null
+    fi
+    zle -C __fzf_extract_command .complete-word __fzf_extract_command
+    zle __fzf_extract_command
+  } always {
+    CURSOR=$cursor_pos
+    zle -D __fzf_extract_command 2>/dev/null
+  }
+
+  prefix=${s_tokens[-1]:0:-${#s_trigger}}
+  if [[ $prefix = *'$('* ]] || [[ $prefix = *'<('* ]] || [[ $prefix = *'>('* ]] || [[ $prefix = *':='* ]] || [[ $prefix = *'`'* ]]; then
+    return 0
+  fi
+  [ -n "${s_tokens[-1]}" ] && lbuf=${LBUFFER:0:-${#s_tokens[-1]}} || lbuf=$LBUFFER
+
+  local s_user_fn_prefix s_dir_fn s_path_fn
+  if [ "$s_trigger" = "$trigger_s_all" ]; then
+    s_user_fn_prefix=_fzf_complete_s_all_
+    s_dir_fn=_fzf_s_all_dir_completion
+    s_path_fn=_fzf_s_all_path_completion
+  else
+    s_user_fn_prefix=_fzf_complete_s_one_
+    s_dir_fn=_fzf_s_one_dir_completion
+    s_path_fn=_fzf_s_one_path_completion
+  fi
+
+  if eval "noglob type ${s_user_fn_prefix}${cmd_word} >/dev/null"; then
+    prefix="$prefix" eval ${s_user_fn_prefix}${cmd_word} ${(q)lbuf}
+    zle reset-prompt
+  elif [ ${d_cmds[(i)$cmd_word]} -le ${#d_cmds} ]; then
+    "$s_dir_fn" "$prefix" "$lbuf"
+  else
+    "$s_path_fn" "$prefix" "$lbuf"
+  fi
+  return 0
 }
 
 _fzf_feed_fifo() {
@@ -411,6 +499,9 @@ fzf-completion() {
 
   lbuf=$LBUFFER
   tail=${LBUFFER:$(( ${#LBUFFER} - ${#trigger} ))}
+
+  # Handle S_ALL/S_ONE custom triggers (# and ##) before the default trigger
+  __fzf_s_trigger_completion && return
 
   # Trigger sequence given
   if [ ${#tokens} -gt 1 -a "$tail" = "$trigger" ]; then
