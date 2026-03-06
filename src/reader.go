@@ -178,7 +178,7 @@ func (r *Reader) feed(src io.Reader) {
 	var err error
 	for {
 		n := 0
-		scope := slab[:util.Min(len(slab), readerBufferSize)]
+		scope := slab[:min(len(slab), readerBufferSize)]
 		for range 100 {
 			n, err = src.Read(scope)
 			if n > 0 || err != nil {
@@ -303,8 +303,12 @@ func (r *Reader) readFiles(roots []string, opts walkerOpts, ignores []string) bo
 		}
 		path = trimPath(path)
 		if path != "." {
-			isDir := de.IsDir()
-			if isDir || opts.follow && isSymlinkToDir(path, de) {
+			isDirSymlink := isSymlinkToDir(path, de)
+			if isDirSymlink && !opts.follow {
+				return filepath.SkipDir
+			}
+			isDir := de.IsDir() || isDirSymlink
+			if isDir {
 				base := filepath.Base(path)
 				if !opts.hidden && base[0] == '.' && base != ".." {
 					return filepath.SkipDir

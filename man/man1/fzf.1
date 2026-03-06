@@ -1,7 +1,7 @@
 .ig
 The MIT License (MIT)
 
-Copyright (c) 2013-2025 Junegunn Choi
+Copyright (c) 2013-2026 Junegunn Choi
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,7 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ..
-.TH fzf 1 "Nov 2025" "fzf 0.67.0" "fzf - a command-line fuzzy finder"
+.TH fzf 1 "Mar 2026" "fzf 0.70.0" "fzf - a command-line fuzzy finder"
 
 .SH NAME
 fzf - a command-line fuzzy finder
@@ -133,6 +133,14 @@ e.g.
 
      # Use template to rearrange fields
      echo foo,bar,baz | fzf --delimiter , --with-nth '{n},{1},{3},{2},{1..2}'
+.RE
+.RS
+
+\fBchange\-with\-nth\fR action is only available when \fB\-\-with\-nth\fR is set.
+When \fB\-\-with\-nth\fR is used, fzf retains the original input lines in memory
+so they can be re\-transformed on the fly (e.g. \fB\-\-with\-nth ..\fR to keep
+the original presentation). This increases memory usage, so only use
+\fB\-\-with\-nth\fR when you actually need field transformation.
 .RE
 .TP
 .BI "\-\-accept\-nth=" "N[,..] or TEMPLATE"
@@ -272,6 +280,7 @@ color mappings. Each entry is separated by a comma and/or whitespaces.
       \fBgutter              \fRGutter on the left
     \fBcurrent\-hl (hl+)      \fRHighlighted substrings (current line)
     \fBalt\-bg                \fRAlternate background color to create striped lines
+    \fBalt\-gutter            \fRAlternate gutter color to create the striped pattern
     \fBquery (input\-fg)      \fRQuery string
       \fBghost               \fRGhost text (\fB\-\-ghost\fR, \fBdim\fR applied by default)
       \fBdisabled            \fRQuery string when search is disabled (\fB\-\-disabled\fR)
@@ -325,10 +334,14 @@ color mappings. Each entry is separated by a comma and/or whitespaces.
     \fB#rrggbb    \fR24-bit colors
 
 .B ANSI ATTRIBUTES: (Only applies to foreground colors)
-    \fBregular        \fRClear previously set attributes; should precede the other ones
-    \fBstrip          \fRRemove colors
+    \fBregular           \fRClear previously set attributes; should precede the other ones
+    \fBstrip             \fRRemove colors
     \fBbold\fR
     \fBunderline\fR
+    \fBunderline-double\fR
+    \fBunderline-curly\fR
+    \fBunderline-dotted\fR
+    \fBunderline-dashed\fR
     \fBreverse\fR
     \fBdim\fR
     \fBitalic\fR
@@ -588,8 +601,11 @@ Highlight the whole current line
 .B "\-\-cycle"
 Enable cyclic scroll
 .TP
-.B "\-\-wrap"
-Enable line wrap
+.BI "\-\-wrap" "[=MODE]"
+Enable line wrap. \fIMODE\fR can be \fBchar\fR (default) or \fBword\fR.
+\fBword\fR mode wraps lines at word boundaries (spaces and tabs) instead of
+at arbitrary character positions. \fB\-\-wrap\-word\fR is a synonym for
+\fB\-\-wrap=word\fR.
 .TP
 .BI "\-\-wrap\-sign" "=INDICATOR"
 Indicator for wrapped lines. The default is '↳ ' or '> ' depending on
@@ -740,7 +756,7 @@ ENVIRONMENT VARIABLES EXPORTED TO CHILD PROCESSES.
 
 e.g.
      \fB# Prepend the current cursor position in yellow
-     fzf \-\-info\-command='echo \-e "\\x1b[33;1m$FZF_POS\\x1b[m/$FZF_INFO 💛"'\fR
+     fzf \-\-info\-command='printf "\\x1b[33;1m$FZF_POS\\x1b[m/$FZF_INFO 💛"'\fR
 
 .TP
 .B "\-\-no\-info"
@@ -840,6 +856,9 @@ e.g.
      # This won't work properly without 'f' flag due to ARG_MAX limit.
      seq 100000 | fzf \-\-preview "awk '{sum+=\\$1} END {print sum}' {*f}"\fR
 
+     \fB# Use {+f} to get the selected items as a line-separated list
+     seq 100 | fzf \-\-multi \-\-bind 'enter:become:cat {+f}'\fR
+
 Also,
 
 * \fB{q}\fR is replaced to the current query string
@@ -909,6 +928,11 @@ Should be used with one of the following \fB\-\-preview\-window\fR options.
 .br
 
 .TP
+.BI "\-\-preview\-wrap\-sign" =INDICATOR
+Indicator for wrapped lines in the preview window. If not set, the value of
+\fB\-\-wrap\-sign\fR is used.
+
+.TP
 .BI "\-\-preview\-label\-pos" [=N[:top|bottom]]
 Position of the border label on the border line of the preview window. Specify
 a positive integer as the column position from the left. Specify a negative
@@ -918,7 +942,7 @@ default value 0 (or \fBcenter\fR) will put the label at the center of the
 border line.
 
 .TP
-.BI "\-\-preview\-window=" "[POSITION][,SIZE[%]][,border\-STYLE][,[no]wrap][,[no]follow][,[no]cycle][,[no]info][,[no]hidden][,+SCROLL[OFFSETS][/DENOM]][,~HEADER_LINES][,default][,<SIZE_THRESHOLD(ALTERNATIVE_LAYOUT)]"
+.BI "\-\-preview\-window=" "[POSITION][,SIZE[%]][,border\-STYLE][,[no]wrap][,wrap\-word][,[no]follow][,[no]cycle][,[no]info][,[no]hidden][,+SCROLL[OFFSETS][/DENOM]][,~HEADER_LINES][,default][,<SIZE_THRESHOLD(ALTERNATIVE_LAYOUT)]"
 
 .RS
 .B POSITION: (default: right)
@@ -936,7 +960,8 @@ default until \fBtoggle\-preview\fR action is triggered.
 execute the command in the background.
 
 * Long lines are truncated by default. Line wrap can be enabled with
-\fBwrap\fR flag.
+\fBwrap\fR flag. \fBwrap\-word\fR flag enables word-level wrapping, which
+breaks lines at word boundaries instead of mid-word.
 
 * Preview window will automatically scroll to the bottom when \fBfollow\fR
 flag is set, similarly to how \fBtail \-f\fR works.
@@ -1212,6 +1237,18 @@ Here is an example script that uses a Unix socket instead of a TCP port.
     curl --unix-socket /tmp/fzf.sock http -d up
     \fR
 
+.TP
+.BI "\-\-threads=" "N"
+Number of matcher threads to use. The default value is
+\fBmin(8 * NUM_CPU, 32)\fR.
+.TP
+.BI "\-\-bench=" "DURATION"
+Repeatedly run \fB\-\-filter\fR for the given duration and print timing
+statistics. Must be used with \fB\-\-filter\fR.
+
+e.g.
+     \fBcat /usr/share/dict/words | fzf \-\-filter abc \-\-bench 10s\fR
+
 .SS DIRECTORY TRAVERSAL
 .TP
 .B "\-\-walker=[file][,dir][,follow][,hidden]"
@@ -1373,11 +1410,15 @@ fzf exports the following environment variables to its child processes.
 .br
 .BR FZF_POS "             Vertical position of the cursor in the list starting from 1"
 .br
+.BR FZF_WRAP "            The line wrapping mode (char, word) when enabled"
+.br
 .BR FZF_QUERY "           Current query string"
 .br
 .BR FZF_INPUT_STATE "     Current input state (enabled, disabled, hidden)"
 .br
 .BR FZF_NTH "             Current \-\-nth option"
+.br
+.BR FZF_WITH_NTH "        Current \-\-with\-nth option"
 .br
 .BR FZF_PROMPT "          Prompt string"
 .br
@@ -1862,12 +1903,14 @@ A key or an event can be bound to one or more of the following actions.
     \fBchange\-border\-label(...)\fR     (change \fB\-\-border\-label\fR to the given string)
     \fBchange\-ghost(...)\fR            (change ghost text to the given string)
     \fBchange\-header(...)\fR           (change header to the given string; doesn't affect \fB\-\-header\-lines\fR)
+    \fBchange\-header\-lines(N)\fR       (change the number of \fB\-\-header\-lines\fR)
     \fBchange\-header\-label(...)\fR     (change \fB\-\-header\-label\fR to the given string)
     \fBchange\-input\-label(...)\fR      (change \fB\-\-input\-label\fR to the given string)
     \fBchange\-list\-label(...)\fR       (change \fB\-\-list\-label\fR to the given string)
     \fBchange\-multi\fR                 (enable multi-select mode with no limit)
     \fBchange\-multi(...)\fR            (enable multi-select mode with a limit or disable it with 0)
     \fBchange\-nth(...)\fR              (change \fB\-\-nth\fR option; rotate through the multiple options separated by '|')
+    \fBchange\-with\-nth(...)\fR         (change \fB\-\-with\-nth\fR option; rotate through the multiple options separated by '|')
     \fBchange\-pointer(...)\fR          (change \fB\-\-pointer\fR option)
     \fBchange\-preview(...)\fR          (change \fB\-\-preview\fR option)
     \fBchange\-preview\-label(...)\fR    (change \fB\-\-preview\-label\fR to the given string)
@@ -1953,12 +1996,14 @@ A key or an event can be bound to one or more of the following actions.
     \fBtoggle\-multi\-line\fR
     \fBtoggle\-preview\fR
     \fBtoggle\-preview\-wrap\fR
+    \fBtoggle\-preview\-wrap\-word\fR
     \fBtoggle\-raw\fR                   (toggle raw mode for displaying non-matching items)
     \fBtoggle\-search\fR                (toggle search functionality)
     \fBtoggle\-sort\fR
     \fBtoggle\-track\fR                 (toggle global tracking option (\fB\-\-track\fR))
     \fBtoggle\-track\-current\fR         (toggle tracking of the current item)
-    \fBtoggle\-wrap\fR                  \fIctrl\-/\fR  \fIalt\-/\fR
+    \fBtoggle\-wrap\fR
+    \fBtoggle\-wrap\-word\fR             \fIctrl\-/\fR  \fIalt\-/\fR
     \fBtoggle+down\fR                  \fIctrl\-i  (tab)\fR
     \fBtoggle+up\fR                    \fIbtab    (shift\-tab)\fR
     \fBtrack\-current\fR                (track the current item; automatically disabled if focus changes)
@@ -1966,10 +2011,12 @@ A key or an event can be bound to one or more of the following actions.
     \fBtransform\-border\-label(...)\fR  (transform border label using an external command)
     \fBtransform\-ghost(...)\fR         (transform ghost text using an external command)
     \fBtransform\-header(...)\fR        (transform header using an external command)
+    \fBtransform\-header\-lines(...)\fR  (transform the number of \fB\-\-header\-lines\fR using an external command)
     \fBtransform\-header\-label(...)\fR  (transform header label using an external command)
     \fBtransform\-input\-label(...)\fR   (transform input label using an external command)
     \fBtransform\-list\-label(...)\fR    (transform list label using an external command)
     \fBtransform\-nth(...)\fR           (transform nth using an external command)
+    \fBtransform\-with\-nth(...)\fR      (transform with-nth using an external command)
     \fBtransform\-pointer(...)\fR       (transform pointer using an external command)
     \fBtransform\-preview\-label(...)\fR (transform preview label using an external command)
     \fBtransform\-prompt(...)\fR        (transform prompt string using an external command)
@@ -2105,7 +2152,7 @@ payload of HTTP POST request to the \fB\-\-listen\fR server.
 
 e.g.
     \fB# Disallow selecting an empty line
-    echo \-e "1. Hello\\n2. Goodbye\\n\\n3. Exit" |
+    printf "1. Hello\\n2. Goodbye\\n\\n3. Exit" |
       fzf \-\-height '~100%' \-\-reverse \-\-header 'Select one' \\
           \-\-bind 'enter:transform:[[ \-n {} ]] &&
                     echo accept ||
