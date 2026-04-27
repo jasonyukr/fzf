@@ -4,8 +4,6 @@
 #  / __/ / /_/ __/
 # /_/   /___/_/ completion.zsh
 #
-# - $FZF_TMUX                 (default: 0)
-# - $FZF_TMUX_OPTS            (default: empty)
 # - $FZF_COMPLETION_TRIGGER   (default: '**')
 # - $FZF_COMPLETION_OPTS      (default: empty)
 # - $FZF_COMPLETION_PATH_OPTS (default: empty)
@@ -102,9 +100,9 @@ if [[ -o interactive ]]; then
 # the changes. See code comments in "common.sh" for the implementation details.
 
 __fzf_defaults() {
-  printf '%s\n' "--height ${FZF_TMUX_HEIGHT:-40%} --min-height 20+ --bind=ctrl-z:ignore $1"
+  builtin printf '%s\n' "--height ${FZF_TMUX_HEIGHT:-40%} --min-height 20+ --bind=ctrl-z:ignore $1"
   command cat "${FZF_DEFAULT_OPTS_FILE-}" 2> /dev/null
-  printf '%s\n' "${FZF_DEFAULT_OPTS-} $2"
+  builtin printf '%s\n' "${FZF_DEFAULT_OPTS-} $2"
 }
 
 __fzf_exec_awk() {

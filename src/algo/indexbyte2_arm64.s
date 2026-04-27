@@ -1,11 +1,11 @@
 #include "textflag.h"
 
-// func indexByteTwo(s []byte, b1, b2 byte) int
+// func IndexByteTwo(s []byte, b1, b2 byte) int
 //
 // Returns the index of the first occurrence of b1 or b2 in s, or -1.
 // Uses ARM64 NEON to search for both bytes in a single pass over the data.
 // Adapted from Go's internal/bytealg/indexbyte_arm64.s (single-byte version).
-TEXT ·indexByteTwo(SB),NOSPLIT,$0-40
+TEXT ·IndexByteTwo(SB),NOSPLIT,$0-40
 	MOVD	s_base+0(FP), R0
 	MOVD	s_len+8(FP), R2
 	MOVBU	b1+24(FP), R1
@@ -78,7 +78,7 @@ loop:
 	CBZ	R6, loop
 
 end:
-	// Found something or out of data — build full syndrome
+	// Found something or out of data, build full syndrome
 	VAND	V5.B16, V3.B16, V3.B16
 	VAND	V5.B16, V4.B16, V4.B16
 	VADDP	V4.B16, V3.B16, V6.B16
