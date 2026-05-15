@@ -149,6 +149,7 @@ __fzf_extract_command() {
 
 __fzf_generic_path_completion() {
   local base lbuf compgen fzf_opts suffix tail dir leftover matches
+  local -a fzf_s_header_opts
   base=$1
   lbuf=$2
   compgen=$3
@@ -172,20 +173,38 @@ __fzf_generic_path_completion() {
         export FZF_DEFAULT_OPTS
         FZF_DEFAULT_OPTS=$(__fzf_defaults "--reverse --scheme=path" "${FZF_COMPLETION_OPTS-}")
         unset FZF_DEFAULT_COMMAND FZF_DEFAULT_OPTS_FILE
+        if [[ ${FZF_PATH_MODE-} = SORTR_ALL ]]; then
+          FZF_S_HEADER_PID_FILE="${TMPDIR:-/tmp}/fzf-s-header-$$"
+          export FZF_S_HEADER_PID_FILE
+          fzf_s_header_opts=(
+            --listen
+            --header='Scanning paths    '
+            "--bind=start:execute-silent(zmodload zsh/net/tcp 2>/dev/null || exit 0; { while :; do for header in 'Scanning paths .  ' 'Scanning paths .. ' 'Scanning paths ...' 'Scanning paths    '; do action=\"change-header:\$header\"; ztcp 127.0.0.1 \"\$FZF_PORT\" 2>/dev/null || exit 0; fd=\$REPLY; printf 'POST / HTTP/1.1\r\nHost: 127.0.0.1:%s\r\nx-api-key: %s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s' \"\$FZF_PORT\" \"\${FZF_API_KEY-}\" \${#action} \"\$action\" >&\$fd; ztcp -c \$fd; sleep 0.2; done; done } & print -r -- \$! >| \"\$FZF_S_HEADER_PID_FILE\")"
+            "--bind=load:execute-silent(pid=; [[ -r \"\$FZF_S_HEADER_PID_FILE\" ]] && read pid < \"\$FZF_S_HEADER_PID_FILE\" && kill \"\$pid\" 2>/dev/null; command rm -f \"\$FZF_S_HEADER_PID_FILE\")+change-header()+change-header-lines(0)+first+exclude"
+          )
+        fi
         if [[ $compgen =~ dir ]]; then
           rest=${FZF_COMPLETION_DIR_OPTS-}
         else
           rest=${FZF_COMPLETION_PATH_OPTS-}
         fi
         if declare -f "$compgen" > /dev/null; then
-          eval "$compgen $(printf %q "$dir")" | __fzf_comprun "$cmd_word" ${(Q)${(Z+n+)fzf_opts}} -q "$leftover" ${(Q)${(Z+n+)rest}}
+          if [[ ${FZF_PATH_MODE-} = SORTR_ALL ]]; then
+            { print -r -- 'Scanning paths'; eval "$compgen $(printf %q "$dir")"; } | __fzf_comprun "$cmd_word" ${(Q)${(Z+n+)fzf_opts}} -q "$leftover" ${(Q)${(Z+n+)rest}} "${fzf_s_header_opts[@]}" --header-lines=1 --no-sync --no-exit-0 --no-select-1
+          else
+            eval "$compgen $(printf %q "$dir")" | __fzf_comprun "$cmd_word" ${(Q)${(Z+n+)fzf_opts}} -q "$leftover" ${(Q)${(Z+n+)rest}}
+          fi
         else
           if [[ $compgen =~ dir ]]; then
             walker=dir,follow
           else
             walker=file,dir,follow,hidden
           fi
-          __fzf_comprun "$cmd_word" ${(Q)${(Z+n+)fzf_opts}} -q "$leftover" --walker "$walker" --walker-root="$dir" ${(Q)${(Z+n+)rest}} < /dev/tty
+          if [[ ${FZF_PATH_MODE-} = SORTR_ALL ]]; then
+            __fzf_comprun "$cmd_word" ${(Q)${(Z+n+)fzf_opts}} -q "$leftover" --walker "$walker" --walker-root="$dir" ${(Q)${(Z+n+)rest}} "${fzf_s_header_opts[@]}" --no-sync --no-exit-0 --no-select-1 < /dev/tty
+          else
+            __fzf_comprun "$cmd_word" ${(Q)${(Z+n+)fzf_opts}} -q "$leftover" --walker "$walker" --walker-root="$dir" ${(Q)${(Z+n+)rest}} < /dev/tty
+          fi
         fi | while read -r item; do
           item="${item%$suffix}$suffix"
           if [[ $item == *" "* ]]; then
