@@ -178,14 +178,22 @@ __fzf_generic_path_completion() {
           rest=${FZF_COMPLETION_PATH_OPTS-}
         fi
         if declare -f "$compgen" > /dev/null; then
-          eval "$compgen $(printf %q "$dir")" | __fzf_comprun "$cmd_word" ${(Q)${(Z+n+)fzf_opts}} -q "$leftover" ${(Q)${(Z+n+)rest}}
+          if [[ ${FZF_PATH_MODE-} = SORTR_ALL ]]; then
+            eval "$compgen $(printf %q "$dir")" | __fzf_comprun "$cmd_word" ${(Q)${(Z+n+)fzf_opts}} -q "$leftover" ${(Q)${(Z+n+)rest}} --bind=start:+hide-header --no-sync --no-exit-0 --no-select-1
+          else
+            eval "$compgen $(printf %q "$dir")" | __fzf_comprun "$cmd_word" ${(Q)${(Z+n+)fzf_opts}} -q "$leftover" ${(Q)${(Z+n+)rest}}
+          fi
         else
           if [[ $compgen =~ dir ]]; then
             walker=dir,follow
           else
             walker=file,dir,follow,hidden
           fi
-          __fzf_comprun "$cmd_word" ${(Q)${(Z+n+)fzf_opts}} -q "$leftover" --walker "$walker" --walker-root="$dir" ${(Q)${(Z+n+)rest}} < /dev/tty
+          if [[ ${FZF_PATH_MODE-} = SORTR_ALL ]]; then
+            __fzf_comprun "$cmd_word" ${(Q)${(Z+n+)fzf_opts}} -q "$leftover" --walker "$walker" --walker-root="$dir" ${(Q)${(Z+n+)rest}} --bind=start:+hide-header --no-sync --no-exit-0 --no-select-1 < /dev/tty
+          else
+            __fzf_comprun "$cmd_word" ${(Q)${(Z+n+)fzf_opts}} -q "$leftover" --walker "$walker" --walker-root="$dir" ${(Q)${(Z+n+)rest}} < /dev/tty
+          fi
         fi | while read -r item; do
           item="${item%$suffix}$suffix"
           if [[ $item == *" "* ]]; then
