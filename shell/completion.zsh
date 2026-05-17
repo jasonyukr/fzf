@@ -255,14 +255,26 @@ __fzf_history_candidates() {
   local max_candidates=${FZF_HISTORY_COMPLETION_MAX_CANDIDATES:-500}
   local count=0
   local dir_prefix=
+  local dir_abs=
+  local pwd_abs=
+  local relative_root=
   local -A seen
   local -a lines words
-  local i line word token expanded compare
+  local i line word token expanded compare display
 
   setopt localoptions nonomatch
 
-  if [[ -n $dir && $dir != . ]]; then
-    dir_prefix=${dir%/}/
+  pwd_abs=${PWD:A}
+  if [[ -n $dir ]]; then
+    case $dir in
+      '~')   dir_abs=$HOME ;;
+      '~/'*) dir_abs=${HOME}${dir#\~} ;;
+      /*)    dir_abs=$dir ;;
+      *)     dir_abs=$pwd_abs/${dir#./} ;;
+    esac
+    dir_abs=${dir_abs:A}
+    dir_prefix=${dir_abs%/}/
+    [[ $dir != /* && $dir != '~'* ]] && relative_root=1
   fi
 
   lines=("${(@f)$(fc -ln -${lines_limit} 2>/dev/null)}")
@@ -303,15 +315,19 @@ __fzf_history_candidates() {
       fi
       # Directory-prefix filter when caller narrowed to a subdir
       if [[ -n $dir_prefix ]]; then
-        compare=${token#./}
-        if [[ $compare != ${dir_prefix}* && $expanded != ${dir_prefix}* ]]; then
+        compare=${expanded:A}
+        if [[ $compare != "$dir_prefix"* ]]; then
           continue
         fi
       fi
+      display=$token
+      if [[ -n $relative_root && $compare == "$pwd_abs"/* ]]; then
+        display=${compare#"$pwd_abs"/}
+      fi
       # Dedupe by display token, preserving newest occurrence
-      [[ -n ${seen[$token]} ]] && continue
-      seen[$token]=1
-      print -r -- "$token"
+      [[ -n ${seen[$display]} ]] && continue
+      seen[$display]=1
+      print -r -- "$display"
       count=$((count + 1))
       [[ $count -ge $max_candidates ]] && return
     done
