@@ -261,7 +261,7 @@ __fzf_history_candidates() {
   local -A seen
   local -a lines words line_cwds
   local i line word token expanded compare display
-  local known_cwd cd_arg cd_idx cd_word try_cwd abs resolved
+  local known_cwd new_cwd cd_arg cd_idx cd_word try_cwd abs resolved
 
   setopt localoptions nonomatch
 
@@ -281,11 +281,16 @@ __fzf_history_candidates() {
   lines=("${(@f)$(fc -ln -${lines_limit} 2>/dev/null)}")
 
   # Forward pass: infer the CWD in effect at each history line by simulating
-  # a leading `cd`. Anchored only by absolute targets (`cd /x`, `cd ~/x`);
-  # before any anchor, CWD stays unknown and relative tokens from those lines
-  # are dropped (matching them against $PWD would risk same-name collisions
-  # with unrelated files). Compound forms (`cd x && y`) are not split, but
-  # the post-line CWD is tried alongside the pre-line CWD when resolving.
+  # a leading `cd`, chaining relative steps so `cd` + `cd bin` accumulates
+  # into $HOME/bin. Each step is committed only if the resolved directory
+  # exists today -- a historical `cd` that would fail now is treated as the
+  # no-op it really was, leaving the anchor on the prior valid directory
+  # instead of poisoning subsequent line resolutions. Anchored initially by
+  # absolute targets (`cd /x`, `cd ~/x`, bare `cd`); before any anchor, CWD
+  # stays unknown and relative tokens from those lines are dropped (matching
+  # against $PWD would risk same-name collisions with unrelated files).
+  # Compound forms (`cd x && y`) are not split, but the post-line CWD is
+  # tried alongside the pre-line CWD when resolving.
   known_cwd=
   for ((i=1; i<=${#lines}; i++)); do
     line_cwds[$i]=$known_cwd
@@ -301,15 +306,21 @@ __fzf_history_candidates() {
       cd_arg=${(Q)cd_word}
       break
     done
+    new_cwd=
     case $cd_arg in
-      ''|'~') known_cwd=$HOME ;;
-      '~/'*)  known_cwd=${HOME}${cd_arg#\~} ;;
-      '~'*)   known_cwd= ;;  # ~user, can't safely expand
-      /*)     known_cwd=$cd_arg ;;
-      -)      known_cwd= ;;  # cd - swaps with OLDPWD, can't track
-      *)      [[ -n $known_cwd ]] && known_cwd=${known_cwd}/${cd_arg} || known_cwd= ;;
+      ''|'~') new_cwd=$HOME ;;
+      '~/'*)  new_cwd=${HOME}${cd_arg#\~} ;;
+      '~'*)   known_cwd= ; continue ;;  # ~user, can't safely expand
+      /*)     new_cwd=$cd_arg ;;
+      -)      known_cwd= ; continue ;;  # cd - swaps with OLDPWD, can't track
+      *)      [[ -n $known_cwd ]] && new_cwd=${known_cwd}/${cd_arg} ;;
     esac
-    [[ -n $known_cwd ]] && known_cwd=${known_cwd:a}
+    if [[ -n $new_cwd ]]; then
+      new_cwd=${new_cwd:a}
+      # Commit only if the target still exists; a failed `cd` would have
+      # left the user in the previous directory.
+      [[ -d $new_cwd ]] && known_cwd=$new_cwd
+    fi
   done
   # Sentinel so the last line can still consult its post-line CWD.
   line_cwds[$((${#lines}+1))]=$known_cwd
