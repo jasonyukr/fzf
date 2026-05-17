@@ -259,8 +259,9 @@ __fzf_history_candidates() {
   local pwd_abs=
   local relative_root=
   local -A seen
-  local -a lines words
+  local -a lines words line_cwds
   local i line word token expanded compare display
+  local known_cwd cd_arg cd_idx cd_word try_cwd abs resolved
 
   setopt localoptions nonomatch
 
@@ -278,6 +279,41 @@ __fzf_history_candidates() {
   fi
 
   lines=("${(@f)$(fc -ln -${lines_limit} 2>/dev/null)}")
+
+  # Forward pass: infer the CWD in effect at each history line by simulating
+  # a leading `cd`. Anchored only by absolute targets (`cd /x`, `cd ~/x`);
+  # before any anchor, CWD stays unknown and relative tokens from those lines
+  # are dropped (matching them against $PWD would risk same-name collisions
+  # with unrelated files). Compound forms (`cd x && y`) are not split, but
+  # the post-line CWD is tried alongside the pre-line CWD when resolving.
+  known_cwd=
+  for ((i=1; i<=${#lines}; i++)); do
+    line_cwds[$i]=$known_cwd
+    line=${lines[$i]}
+    [[ -z $line ]] && continue
+    words=(${(z)line})
+    [[ ${words[1]} != cd ]] && continue
+    cd_arg=
+    for ((cd_idx=2; cd_idx<=${#words}; cd_idx++)); do
+      cd_word=${words[$cd_idx]}
+      [[ $cd_word == '-' ]] && { cd_arg='-'; break; }
+      [[ $cd_word == -* ]] && continue
+      cd_arg=${(Q)cd_word}
+      break
+    done
+    case $cd_arg in
+      ''|'~') known_cwd=$HOME ;;
+      '~/'*)  known_cwd=${HOME}${cd_arg#\~} ;;
+      '~'*)   known_cwd= ;;  # ~user, can't safely expand
+      /*)     known_cwd=$cd_arg ;;
+      -)      known_cwd= ;;  # cd - swaps with OLDPWD, can't track
+      *)      [[ -n $known_cwd ]] && known_cwd=${known_cwd}/${cd_arg} || known_cwd= ;;
+    esac
+    [[ -n $known_cwd ]] && known_cwd=${known_cwd:a}
+  done
+  # Sentinel so the last line can still consult its post-line CWD.
+  line_cwds[$((${#lines}+1))]=$known_cwd
+
   for ((i=${#lines}; i>=1; i--)); do
     line=${lines[$i]}
     [[ -z $line ]] && continue
@@ -307,8 +343,28 @@ __fzf_history_candidates() {
         '~/'*) expanded=${HOME}${token#\~} ;;
         *)     expanded=$token ;;
       esac
-      # Existence check
-      [[ ! -e $expanded ]] && continue
+      # Absolute paths: existence check against the literal target.
+      # Relative paths: must resolve against an inferred historical CWD
+      # (pre-line first, then post-line for `cd X && cmd Y`). No fallback
+      # to $PWD-relative resolution -- a bare `foo.txt` from history could
+      # collide with an unrelated file of the same name in the current dir.
+      if [[ $expanded == /* ]]; then
+        [[ ! -e $expanded ]] && continue
+      else
+        resolved=0
+        for try_cwd in $line_cwds[$i] $line_cwds[$((i+1))]; do
+          [[ -z $try_cwd ]] && continue
+          abs=${try_cwd}/$expanded
+          abs=${abs:a}
+          if [[ -e $abs ]]; then
+            expanded=$abs
+            token=$abs
+            resolved=1
+            break
+          fi
+        done
+        (( resolved )) || continue
+      fi
       # Kind filter
       if [[ $kind == dir ]]; then
         [[ ! -d $expanded ]] && continue
