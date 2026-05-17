@@ -238,17 +238,112 @@ _fzf_s_all_dir_completion() {
     "" "/" ""
 }
 
+# Emit existing files/dirs referenced in recent zsh history, newest first.
+# Lazy: only runs when the history trigger ('###' by default) fires.
+__fzf_history_candidates() {
+  local kind=$1
+  local dir=${2:-.}
+  local lines_limit=${FZF_HISTORY_COMPLETION_LINES:-2000}
+  local max_candidates=${FZF_HISTORY_COMPLETION_MAX_CANDIDATES:-500}
+  local count=0
+  local dir_prefix=
+  local -A seen
+  local -a lines words
+  local i line word token expanded compare
+
+  setopt localoptions nonomatch
+
+  if [[ -n $dir && $dir != . ]]; then
+    dir_prefix=${dir%/}/
+  fi
+
+  lines=("${(@f)$(fc -ln -${lines_limit} 2>/dev/null)}")
+  for ((i=${#lines}; i>=1; i--)); do
+    line=${lines[$i]}
+    [[ -z $line ]] && continue
+    words=(${(z)line})
+    for word in $words; do
+      [[ -z $word ]] && continue
+      # Skip option flags
+      [[ $word == -* ]] && continue
+      # Skip unsafe constructs (command/process substitutions, backticks)
+      [[ $word == *'$('* ]] && continue
+      [[ $word == *'`'*  ]] && continue
+      [[ $word == *'<('* ]] && continue
+      [[ $word == *'>('* ]] && continue
+      # Skip URLs and scp-style remotes
+      [[ $word == *://* ]] && continue
+      [[ $word == *@*:* ]] && continue
+      # Skip assignment-like tokens (FOO=bar) unless they begin with a path marker
+      if [[ $word == *=* && $word != /* && $word != ./* && $word != ../* && $word != '~'* ]]; then
+        continue
+      fi
+      # Unquote (parameter-level only; does not evaluate)
+      token=${(Q)word}
+      [[ -z $token ]] && continue
+      # Safe tilde expansion (no eval of arbitrary tokens)
+      case $token in
+        '~')   expanded=$HOME ;;
+        '~/'*) expanded=${HOME}${token#\~} ;;
+        *)     expanded=$token ;;
+      esac
+      # Existence check
+      [[ ! -e $expanded ]] && continue
+      # Kind filter
+      if [[ $kind == dir ]]; then
+        [[ ! -d $expanded ]] && continue
+      fi
+      # Directory-prefix filter when caller narrowed to a subdir
+      if [[ -n $dir_prefix ]]; then
+        compare=${token#./}
+        if [[ $compare != ${dir_prefix}* && $expanded != ${dir_prefix}* ]]; then
+          continue
+        fi
+      fi
+      # Dedupe by display token, preserving newest occurrence
+      [[ -n ${seen[$token]} ]] && continue
+      seen[$token]=1
+      print -r -- "$token"
+      count=$((count + 1))
+      [[ $count -ge $max_candidates ]] && return
+    done
+  done
+}
+
+_fzf_compgen_history_path() {
+  __fzf_history_candidates path "$1"
+}
+
+_fzf_compgen_history_dir() {
+  __fzf_history_candidates dir "$1"
+}
+
+_fzf_history_path_completion() {
+  FZF_PATH_MODE=HISTORY __fzf_generic_path_completion "$1" "$2" _fzf_compgen_history_path \
+    "-m" "" " "
+}
+
+_fzf_history_dir_completion() {
+  FZF_PATH_MODE=HISTORY __fzf_generic_path_completion "$1" "$2" _fzf_compgen_history_dir \
+    "" "/" ""
+}
+
 # S_ALL/S_ONE custom trigger handler.
 # Called from fzf-completion; accesses parent-scope locals via zsh dynamic scoping:
 #   tokens, d_cmds, cursor_pos, cmd_word, prefix, lbuf (all declared in fzf-completion)
 __fzf_s_trigger_completion() {
+  local trigger_history=${FZF_HISTORY_COMPLETION_TRIGGER-'###'}
   local trigger_s_all=${FZF_S_ALL_COMPLETION_TRIGGER-'##'}
   local trigger_s_one=${FZF_S_ONE_COMPLETION_TRIGGER-'#'}
+  local tail_history=${LBUFFER:$(( ${#LBUFFER} - ${#trigger_history} ))}
   local tail_s_all=${LBUFFER:$(( ${#LBUFFER} - ${#trigger_s_all} ))}
   local tail_s_one=${LBUFFER:$(( ${#LBUFFER} - ${#trigger_s_one} ))}
 
+  # Detect '###' before '##' before '#' so longer triggers win.
   local s_trigger=
-  if [ ${#tokens} -gt 1 -a "$tail_s_all" = "$trigger_s_all" ]; then
+  if [ -n "$trigger_history" -a ${#tokens} -gt 1 -a "$tail_history" = "$trigger_history" ]; then
+    s_trigger=$trigger_history
+  elif [ ${#tokens} -gt 1 -a "$tail_s_all" = "$trigger_s_all" ]; then
     s_trigger=$trigger_s_all
   elif [ ${#tokens} -gt 1 -a "$tail_s_one" = "$trigger_s_one" ]; then
     s_trigger=$trigger_s_one
@@ -280,7 +375,11 @@ __fzf_s_trigger_completion() {
   [ -n "${s_tokens[-1]}" ] && lbuf=${LBUFFER:0:-${#s_tokens[-1]}} || lbuf=$LBUFFER
 
   local s_user_fn_prefix s_dir_fn s_path_fn
-  if [ "$s_trigger" = "$trigger_s_all" ]; then
+  if [ "$s_trigger" = "$trigger_history" ]; then
+    s_user_fn_prefix=_fzf_complete_history_
+    s_dir_fn=_fzf_history_dir_completion
+    s_path_fn=_fzf_history_path_completion
+  elif [ "$s_trigger" = "$trigger_s_all" ]; then
     s_user_fn_prefix=_fzf_complete_s_all_
     s_dir_fn=_fzf_s_all_dir_completion
     s_path_fn=_fzf_s_all_path_completion
