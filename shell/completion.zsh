@@ -260,14 +260,14 @@ _fzf_history_dir_completion() {
 # Called from fzf-completion; accesses parent-scope locals via zsh dynamic scoping:
 #   tokens, d_cmds, cursor_pos, cmd_word, prefix, lbuf (all declared in fzf-completion)
 __fzf_s_trigger_completion() {
-  local trigger_history=${FZF_HISTORY_COMPLETION_TRIGGER-'###'}
-  local trigger_s_all=${FZF_S_ALL_COMPLETION_TRIGGER-'##'}
-  local trigger_s_one=${FZF_S_ONE_COMPLETION_TRIGGER-'#'}
+  local trigger_history=${FZF_HISTORY_COMPLETION_TRIGGER-'++'}
+  local trigger_s_all=${FZF_S_ALL_COMPLETION_TRIGGER-'@@'}
+  local trigger_s_one=${FZF_S_ONE_COMPLETION_TRIGGER-'@'}
   local tail_history=${LBUFFER:$(( ${#LBUFFER} - ${#trigger_history} ))}
   local tail_s_all=${LBUFFER:$(( ${#LBUFFER} - ${#trigger_s_all} ))}
   local tail_s_one=${LBUFFER:$(( ${#LBUFFER} - ${#trigger_s_one} ))}
 
-  # Detect '###' before '##' before '#' so longer triggers win.
+  # Detect history before S_ALL before S_ONE so longer triggers win.
   local s_trigger=
   if [ -n "$trigger_history" -a ${#tokens} -gt 1 -a "$tail_history" = "$trigger_history" ]; then
     s_trigger=$trigger_history
@@ -528,7 +528,7 @@ fzf-completion() {
   lbuf=$LBUFFER
   tail=${LBUFFER:$(( ${#LBUFFER} - ${#trigger} ))}
 
-  # Handle S_ALL/S_ONE custom triggers (# and ##) before the default trigger
+  # Handle history/S_ALL/S_ONE custom triggers before the default trigger
   __fzf_s_trigger_completion && return
 
   # Trigger sequence given
