@@ -1,6 +1,41 @@
 CHANGELOG
 =========
 
+0.73.1
+------
+- Bug fixes
+    - Skip `$FZF_CURRENT_ITEM` export when the item contains a NUL byte; `exec(2)` rejects the env, breaking preview and other child commands (#2395)
+    - Fixed O(n^2) HTTP body accumulation in `--listen`; a single ~390 KB request could block the single-threaded server for ~8 s (Michal Majchrowicz, Marcin Wyczechowski, AFINE Team)
+
+0.73.0
+------
+_Release highlights: https://junegunn.github.io/fzf/releases/0.73.0/_
+
+- Nushell integration via `fzf --nushell` and the installer (#4630) (@sim590)
+- New `--preview-window=next` position that places the preview adjacent to the input section, on the list side: above the input in the default layout, below it in `--layout=reverse` (#4798)
+- Timer-driven `every(N)` event for `--bind`, where `N` is seconds
+- Added `$FZF_IDLE_TIME` (whole seconds) and `$FZF_IDLE_TIME_MS` (milliseconds), holding the elapsed time since the last user activity
+    - Pair with `every(N)` to build idle-based behavior such as auto-accept or auto-quit (#1211)
+      ```sh
+      # Live process list; --track --id-nth 2 keeps the cursor on the same PID across reloads
+      fzf --header-lines 1 --track --id-nth 2 --bind 'start,every(2):reload-sync:ps -ef'
+
+      # Auto-accept after 10 seconds of inactivity, with a countdown in the footer after 5s
+      fzf --bind 'every(1):bg-transform:
+        if   [[ $FZF_IDLE_TIME -lt 5  ]]; then echo change-footer:
+        elif [[ $FZF_IDLE_TIME -lt 10 ]]; then echo "change-footer:auto-accept in $((10 - FZF_IDLE_TIME))s"
+        else echo accept
+        fi'
+      ```
+- Added `$FZF_CURRENT_ITEM` for shells where quoting `{}` is awkward (#4802)
+- Bug fixes
+    - Scoring: non-word characters at the start of input or after a delimiter now receive the same boundary bonus as word characters (#4795)
+    - `change-preview-window` no longer resets `wrap` / `wrap-word` state set via `toggle-preview-wrap` / `toggle-preview-wrap-word` (#4791)
+    - Stripped UTF-8-encoded C1 control characters from rendered items to prevent terminal control-sequence injection
+    - Fixed integer-overflow panic in `FuzzyMatchV2` on 32-bit builds (Michal Majchrowicz, Marcin Wyczechowski, AFINE Team)
+    - Fixed `bg-transform` `reload` / `exclude` payloads being dropped
+    - Fixed rendering glitch with preview window on the left combined with footer
+
 0.72.0
 ------
 _Release highlights: https://junegunn.github.io/fzf/releases/0.72.0/_
